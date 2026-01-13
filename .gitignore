@@ -1,0 +1,38 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Environment
+.env
+
+# Logs
+logs/
+*.log
+access.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+
+# DB
+*.sqlite
+*.sqlite3
+
+# Misc
+coverage/
+
+# Optional
+.env.local
+.env.*.local
+

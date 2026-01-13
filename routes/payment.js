@@ -1,0 +1,28 @@
+const express = require("express");
+const router = express.Router();
+const paymentController = require("../controllers/payment");
+
+/**
+ * Payment Routes
+ */
+
+// POST /payment/create - Create PayPal payment (Authenticated users)
+router.post("/create", paymentController.postCreatePayment);
+
+// POST /payment/execute - Execute PayPal payment (Authenticated users)
+router.post("/execute", paymentController.postExecutePayment);
+
+// GET /payment/success - PayPal success callback
+router.get("/success", paymentController.getPaymentSuccess);
+
+// GET /payment/cancel - PayPal cancel callback
+router.get("/cancel", paymentController.getPaymentCancel);
+
+// POST /payment/webhook - PayPal webhook handler (no auth required for webhooks)
+router.post("/webhook", paymentController.postPayPalWebhook);
+
+// GET /payment/order/:orderId - Get payment by order ID (Authenticated users)
+router.get("/order/:orderId", paymentController.getPaymentByOrder);
+
+module.exports = router;
+
