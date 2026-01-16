@@ -12,15 +12,29 @@ const sequelize = require('../util/database');
  */
 exports.getInventory = async (req, res, next) => {
   try {
-    const { lowStock, search } = req.query;
+    const { lowStock, search, status, category, page = 1 } = req.query;
+    const Category = require('../models/category');
+    const limit = 50;
+    const offset = (page - 1) * limit;
 
     const whereClause = { isActive: true };
 
-    // Filter by low stock
-    if (lowStock === 'true') {
+    // Filter by stock status
+    if (status === 'lowStock' || lowStock === 'true') {
       whereClause.stock = {
-        [Op.lte]: sequelize.col('lowStockThreshold')
+        [Op.lte]: sequelize.col('low_stock_threshold')
       };
+    } else if (status === 'outOfStock') {
+      whereClause.stock = 0;
+    } else if (status === 'inStock') {
+      whereClause.stock = {
+        [Op.gt]: 0
+      };
+    }
+
+    // Filter by category
+    if (category && category !== 'all') {
+      whereClause.categoryId = category;
     }
 
     // Search by title or SKU
@@ -31,33 +45,36 @@ exports.getInventory = async (req, res, next) => {
       ];
     }
 
-    const products = await Product.findAll({
+    const { count, rows: products } = await Product.findAndCountAll({
       where: whereClause,
-      attributes: ['id', 'title', 'sku', 'stock', 'lowStockThreshold', 'price'],
-      order: [['stock', 'ASC']]
+      include: [{ model: Category, as: 'category', required: false }],
+      attributes: ['id', 'title', 'sku', 'stock', 'low_stock_threshold', 'price'],
+      order: [['stock', 'ASC']],
+      limit,
+      offset
     });
 
-    const inventory = products.map(p => ({
-      id: p.id,
-      title: p.title,
-      sku: p.sku,
-      stock: p.stock,
-      lowStockThreshold: p.lowStockThreshold,
-      price: p.price,
-      isLowStock: p.stock <= p.lowStockThreshold,
-      stockStatus: p.stock === 0 ? 'Out of Stock' :
-                   p.stock <= p.lowStockThreshold ? 'Low Stock' : 'In Stock'
-    }));
+    // Get all categories for filter
+    const categories = await Category.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']]
+    });
 
-    res.status(200).json({
-      inventory,
-      count: inventory.length,
-      lowStockCount: inventory.filter(i => i.isLowStock).length
+    const totalPages = Math.ceil(count / limit);
+
+    res.render('warehouse/inventory', {
+      pageTitle: 'Inventory Management',
+      path: '/warehouse/inventory',
+      products,
+      categories,
+      currentPage: parseInt(page),
+      totalPages,
+      totalProducts: count
     });
 
   } catch (error) {
     console.error('Get inventory error:', error);
-    res.status(500).json({ error: 'Failed to fetch inventory' });
+    res.status(500).render('500', { error: 'Failed to fetch inventory' });
   }
 };
 

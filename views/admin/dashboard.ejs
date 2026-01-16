@@ -1,0 +1,254 @@
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .admin-dashboard {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .admin-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .admin-header h1 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+        }
+        .admin-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        #logoutBtn:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid #667eea;
+        }
+        .metric-card.warning {
+            border-top-color: #f39c12;
+        }
+        .metric-card.success {
+            border-top-color: #27ae60;
+        }
+        .metric-card.danger {
+            border-top-color: #e74c3c;
+        }
+        .metric-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        .metric-card .value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .metric-card .label {
+            color: #999;
+            font-size: 12px;
+        }
+        .admin-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .admin-section {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .admin-section h2 {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-icon {
+            font-size: 24px;
+        }
+        .action-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .action-list li {
+            margin-bottom: 10px;
+        }
+        .action-list a {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #333;
+            transition: 0.3s;
+        }
+        .action-list a:hover {
+            background: #667eea;
+            color: white;
+            transform: translateX(5px);
+        }
+        .quick-stats {
+            display: grid;
+            gap: 10px;
+        }
+        .quick-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .quick-stat strong {
+            color: #333;
+        }
+        .quick-stat span {
+            color: #667eea;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <%- include('../includes/navigation.ejs') %>
+
+    <main class="admin-dashboard">
+        <div class="admin-header">
+            <div>
+                <h1>👑 Admin Dashboard</h1>
+                <p>Complete system overview and management</p>
+            </div>
+            <button id="logoutBtn" data-logout style="padding: 12px 30px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 16px;">
+                Logout
+            </button>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card success">
+                <h3>Total Products</h3>
+                <div class="value"><%= locals.productCount || 0 %></div>
+                <div class="label">Active products</div>
+            </div>
+            <div class="metric-card">
+                <h3>Total Orders</h3>
+                <div class="value"><%= locals.orderCount || 0 %></div>
+                <div class="label">All time</div>
+            </div>
+            <div class="metric-card success">
+                <h3>Revenue</h3>
+                <div class="value">$<%= (locals.totalRevenue || 0).toFixed(0) %></div>
+                <div class="label">Total earnings</div>
+            </div>
+            <div class="metric-card">
+                <h3>Total Users</h3>
+                <div class="value"><%= locals.userCount || 0 %></div>
+                <div class="label">Registered accounts</div>
+            </div>
+            <div class="metric-card warning">
+                <h3>Pending Orders</h3>
+                <div class="value"><%= locals.pendingOrders || 0 %></div>
+                <div class="label">Need attention</div>
+            </div>
+            <div class="metric-card danger">
+                <h3>Low Stock Items</h3>
+                <div class="value"><%= locals.lowStockCount || 0 %></div>
+                <div class="label">Restock needed</div>
+            </div>
+        </div>
+
+        <div class="admin-sections">
+            <div class="admin-section">
+                <h2><span class="section-icon">📦</span> Product Management</h2>
+                <ul class="action-list">
+                    <li><a href="/admin/product-list">📋 View All Products</a></li>
+                    <li><a href="/admin/add-product">➕ Add New Product</a></li>
+                    <li><a href="/categories">📂 Manage Categories</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h2><span class="section-icon">🛒</span> Order Management</h2>
+                <ul class="action-list">
+                    <li><a href="/admin/orders">📋 All Orders</a></li>
+                    <li><a href="/admin/orders?status=pending">⏳ Pending Orders</a></li>
+                    <li><a href="/admin/orders?status=shipped">🚚 Shipped Orders</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h2><span class="section-icon">📊</span> Warehouse</h2>
+                <ul class="action-list">
+                    <li><a href="/warehouse/inventory">📦 View Inventory</a></li>
+                    <li><a href="/warehouse/orders-to-pack">📋 Orders to Pack</a></li>
+                    <li><a href="/warehouse/inventory-history">📜 Stock History</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h2><span class="section-icon">💰</span> Finance</h2>
+                <ul class="action-list">
+                    <li><a href="/payment/dashboard">💳 Payment Dashboard</a></li>
+                    <li><a href="/payment/transactions">💵 All Transactions</a></li>
+                    <li><a href="/payment/reports">📈 Financial Reports</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h2><span class="section-icon">👥</span> User Management</h2>
+                <ul class="action-list">
+                    <li><a href="/admin/users">👤 All Users</a></li>
+                    <li><a href="/admin/users?status=locked">🔒 Locked Accounts</a></li>
+                    <li><a href="/admin/users?status=unverified">⚠️ Unverified Users</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h2><span class="section-icon">📈</span> Quick Stats</h2>
+                <div class="quick-stats">
+                    <div class="quick-stat">
+                        <strong>Today's Orders</strong>
+                        <span><%= locals.todayOrders || 0 %></span>
+                    </div>
+                    <div class="quick-stat">
+                        <strong>Today's Revenue</strong>
+                        <span>$<%= (locals.todayRevenue || 0).toFixed(2) %></span>
+                    </div>
+                    <div class="quick-stat">
+                        <strong>Active Categories</strong>
+                        <span><%= locals.categoryCount || 0 %></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+<%- include('../includes/end.ejs') %>
+

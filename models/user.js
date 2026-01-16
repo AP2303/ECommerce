@@ -57,6 +57,11 @@ const User = sequelize.define("user", {
   lastLoginAt: {
     type: Sequelize.DATE,
     allowNull: true
+  },
+  roleId: {
+    type: Sequelize.INTEGER,
+    allowNull: true,
+    comment: 'Foreign key to roles table'
   }
 });
 

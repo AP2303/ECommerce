@@ -25,6 +25,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const helmet = require('helmet');
 
+const authController = require('./controllers/auth');
+const roleAuth = require('./middleware/roleAuth');
+const dashboardController = require('./controllers/dashboard');
+const userController = require('./controllers/user');
+
 const app = express();
 
 // Session configuration
@@ -44,6 +49,15 @@ app.use(flash());
 app.set("view engine", "ejs");
 app.set("views", "views");
 
+// parse incoming JSON for fetch requests
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// quick login/logout endpoints (front-end uses these paths)
+app.post('/login', authController.postLogin);
+app.post('/logoutnow', authController.postLogout);
+
 const adminRoutes = require("./routes/admin");
 const shopRoutes = require("./routes/shop");
 const authRoutes = require("./routes/auth");
@@ -61,32 +75,29 @@ app.use(morgan('combined', {stream: accessLogStream}));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Load user from session into req.user. In development, fall back to a seeded customer or any user so controllers don't crash.
+// Load user from session into req.user
 app.use(async (req, res, next) => {
   try {
+    let user = null;
     if (req.session && req.session.userId) {
-      const user = await User.findByPk(req.session.userId);
+      console.log('Loading user from session, userId:', req.session.userId);
+      user = await User.findByPk(req.session.userId, { include: [{ model: Role, as: 'role' }] });
       if (user) {
-        req.user = user;
-        return next();
+        console.log('User loaded:', user.email, 'Role:', user.role ? user.role.name : 'NO ROLE');
+      } else {
+        console.log('User not found for session userId:', req.session.userId);
       }
+    } else {
+      console.log('No active session');
     }
 
-    if (process.env.NODE_ENV !== 'production') {
-      // Prefer the seeded customer account if present
-      let user = await User.findOne({ where: { email: 'customer@bookstore.com' } }).catch(() => null);
-      if (!user) {
-        // fallback to any user in the DB
-        user = await User.findOne().catch(() => null);
-      }
-      if (user) {
-        req.user = user;
-        return next();
-      }
-    }
+    req.user = user || null;
 
-    // No user available; set to null so controllers can handle gracefully
-    req.user = null;
+    // Expose auth state & role to views
+    res.locals.isAuthenticated = !!req.user;
+    res.locals.currentUser = req.user;
+    res.locals.currentRole = req.user && req.user.role ? req.user.role.name : null;
+
     next();
   } catch (err) {
     console.error('Error in user-loading middleware:', err);
@@ -94,59 +105,55 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Commented out old user middleware - will use authentication from /auth routes instead
-/*
-app.use((req, res, next) => {
-  User.findByPk(1)
-    .then((user) => {
-      req.user = user;
-      next();
-    })
-    .catch((error) => {
-      console.log("Error in App.js, in user retrieval, {}", error);
-    });
+// Welcome page at root (public - no authentication required)
+app.get('/', (req, res) => {
+  // Check if user is logged in
+  const isLoggedIn = req.user ? true : false;
+  const userRole = req.user && req.user.role ? req.user.role.name : null;
+
+  res.render('welcome', {
+    pageTitle: 'Welcome to Our Book Store',
+    path: '/',
+    isLoggedIn,
+    userRole,
+    userName: req.user ? req.user.name : null
+  });
 });
 
-app.use(session({
-  secret: "Celesi", 
-  resave: false,                    
-  saveUninitialized: false         
-}));
-
-app.use((req, res, next) => {
-  if (req.method === "POST"){
-    next();
-    return;
-  }
-  console.log("got her");
-  console.log( "sessoip nn", req.session.user);
-  if (!req.session.user){
-    res.render("user/index", {errorMessage : ""});
-  }
-  else next(); 
+// Auth page routes - accessible even if logged in (will show appropriate message)
+app.get('/login', (req, res) => {
+  const errors = req.flash ? req.flash('error') : [];
+  const isLoggedIn = req.user ? true : false;
+  res.render('user/index', {
+    errorMessage: errors,
+    isLoggedIn,
+    userName: req.user ? req.user.name : null
+  });
 });
 
-
-app.post("/login", async (req, res) => {
-  req.session.user = "1";
-  res.send("ok");
+app.get('/register', (req, res) => {
+  const isLoggedIn = req.user ? true : false;
+  res.render('auth/register', {
+    isLoggedIn,
+    userName: req.user ? req.user.name : null
+  });
 });
 
+// Dashboard routes - role-specific
+app.get('/customer/dashboard', roleAuth.ensureAuthenticated, dashboardController.getCustomerDashboard);
+app.get('/admin/dashboard', roleAuth.ensureAdmin, dashboardController.getAdminDashboard);
+app.get('/warehouse/dashboard', roleAuth.ensureRoles(['Warehouse', 'Administrator']), dashboardController.getWarehouseDashboard);
+app.get('/payment/dashboard', roleAuth.ensureRoles(['Finance', 'Administrator']), dashboardController.getFinanceDashboard);
 
-app.post("/logoutnow", async (req, res) => {
-  console.log("destroy");
-  req.session.user = "";
-  res.render("user/index", {errorMessage : ""});
-});
-*/
+// API routes
+app.get('/api/roles', roleAuth.ensureAdmin, userController.getRoles);
 
-// Old login routes commented out - use /auth routes instead
-
-app.use("/admin", adminRoutes);
+// Mount routes with role-based protection
+app.use('/admin', roleAuth.ensureAdmin, adminRoutes);
+app.use('/warehouse', roleAuth.ensureRoles(['Warehouse', 'Administrator']), warehouseRoutes);
+app.use('/payment', roleAuth.ensureRoles(['Finance', 'Administrator']), paymentRoutes);
 app.use("/auth", authRoutes);
 app.use("/categories", categoryRoutes);
-app.use("/payment", paymentRoutes);
-app.use("/warehouse", warehouseRoutes);
 app.use(shopRoutes);
 
 app.use(errorController.get404);
@@ -220,6 +227,9 @@ async function startServer() {
       const userCount = await User.count();
       if (userCount === 0) {
         console.log('No users found in DB — creating default roles and users for development');
+
+        const bcrypt = require('bcrypt');
+
         const roles = [
           { name: 'Customer', description: 'Regular customer' },
           { name: 'Administrator', description: 'Admin user' },
@@ -233,8 +243,36 @@ async function startServer() {
         const adminRole = await Role.findOne({ where: { name: 'Administrator' } });
         const customerRole = await Role.findOne({ where: { name: 'Customer' } });
 
-        await User.findOrCreate({ where: { email: 'admin@bookstore.com' }, defaults: { name: 'Admin User', email: 'admin@bookstore.com', password: 'admin123', roleId: adminRole.id, emailVerified: true } });
-        await User.findOrCreate({ where: { email: 'customer@bookstore.com' }, defaults: { name: 'Test Customer', email: 'customer@bookstore.com', password: 'customer123', roleId: customerRole.id, emailVerified: true } });
+        // Hash passwords before creating users
+        const adminPasswordHash = await bcrypt.hash('admin123', 12);
+        const customerPasswordHash = await bcrypt.hash('customer123', 12);
+
+        await User.findOrCreate({
+          where: { email: 'admin@bookstore.com' },
+          defaults: {
+            name: 'Admin User',
+            email: 'admin@bookstore.com',
+            password: adminPasswordHash,
+            roleId: adminRole.id,
+            emailVerified: true,
+            loginAttempts: 0,
+            isLocked: false
+          }
+        });
+
+        await User.findOrCreate({
+          where: { email: 'customer@bookstore.com' },
+          defaults: {
+            name: 'Test Customer',
+            email: 'customer@bookstore.com',
+            password: customerPasswordHash,
+            roleId: customerRole.id,
+            emailVerified: true,
+            loginAttempts: 0,
+            isLocked: false
+          }
+        });
+
         console.log('Default dev users created (admin@bookstore.com / admin123, customer@bookstore.com / customer123)');
       }
     }

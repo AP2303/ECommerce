@@ -1,0 +1,274 @@
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .inventory-container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .inventory-header {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .inventory-header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .filter-controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-controls select,
+        .filter-controls input {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .filter-controls button {
+            padding: 10px 20px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .filter-controls button:hover {
+            background: #229954;
+        }
+        .inventory-table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .inventory-table thead {
+            background: #f8f9fa;
+        }
+        .inventory-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #eee;
+        }
+        .inventory-table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .inventory-table tr:hover {
+            background: #f8f9fa;
+        }
+        .stock-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .stock-good {
+            background: #e6ffe6;
+            color: #27ae60;
+        }
+        .stock-low {
+            background: #fff3e6;
+            color: #f39c12;
+        }
+        .stock-critical {
+            background: #ffe6e6;
+            color: #e74c3c;
+        }
+        .stock-out {
+            background: #f0f0f0;
+            color: #999;
+        }
+        .action-btn-small {
+            padding: 6px 12px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .action-btn-small:hover {
+            background: #5568d3;
+        }
+        .pagination {
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #eee;
+        }
+        .pagination a {
+            display: inline-block;
+            padding: 8px 15px;
+            margin: 0 5px;
+            background: #f8f9fa;
+            color: #333;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+        .pagination a.active {
+            background: #27ae60;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <%- include('../includes/navigation.ejs') %>
+
+    <main class="inventory-container">
+        <div class="inventory-header">
+            <h1>📦 Inventory Management</h1>
+            <a href="/warehouse/dashboard" class="action-btn-small" style="background: white; color: #27ae60;">
+                ← Back to Dashboard
+            </a>
+        </div>
+
+        <div class="filter-controls">
+            <select id="filterStatus">
+                <option value="all">All Products</option>
+                <option value="inStock">In Stock</option>
+                <option value="lowStock">Low Stock</option>
+                <option value="outOfStock">Out of Stock</option>
+            </select>
+            <select id="filterCategory">
+                <option value="all">All Categories</option>
+                <% if (locals.categories) { %>
+                    <% locals.categories.forEach(cat => { %>
+                        <option value="<%= cat.id %>"><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
+            <input type="text" id="searchInput" placeholder="Search products...">
+            <button id="applyFiltersBtn">Apply Filters</button>
+            <button id="resetFiltersBtn" style="background: #666;">Reset</button>
+        </div>
+
+        <div class="inventory-table-container">
+            <table class="inventory-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th>Category</th>
+                        <th>Stock</th>
+                        <th>Threshold</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (locals.products && locals.products.length > 0) { %>
+                        <% locals.products.forEach(product => { %>
+                            <tr>
+                                <td>
+                                    <strong><%= product.title %></strong>
+                                    <br>
+                                    <small style="color: #666;">Price: $<%= product.price %></small>
+                                </td>
+                                <td><%= product.sku || 'N/A' %></td>
+                                <td><%= product.category ? product.category.name : 'Uncategorized' %></td>
+                                <td>
+                                    <strong style="font-size: 18px;"><%= product.stock %></strong>
+                                </td>
+                                <td><%= product.low_stock_threshold || 10 %></td>
+                                <td>
+                                    <% if (product.stock === 0) { %>
+                                        <span class="stock-badge stock-out">Out of Stock</span>
+                                    <% } else if (product.stock <= (product.low_stock_threshold || 10)) { %>
+                                        <span class="stock-badge stock-critical">Critical</span>
+                                    <% } else if (product.stock <= (product.low_stock_threshold || 10) * 2) { %>
+                                        <span class="stock-badge stock-low">Low</span>
+                                    <% } else { %>
+                                        <span class="stock-badge stock-good">Good</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <button class="action-btn-small update-stock-btn" data-product-id="<%= product.id %>" data-product-name="<%= product.title %>">
+                                        Update Stock
+                                    </button>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 40px; color: #999;">
+                                No products found
+                            </td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+
+            <% if (locals.totalPages && locals.totalPages > 1) { %>
+                <div class="pagination">
+                    <% for (let i = 1; i <= locals.totalPages; i++) { %>
+                        <a href="?page=<%= i %>" class="<%= i === (locals.currentPage || 1) ? 'active' : '' %>">
+                            <%= i %>
+                        </a>
+                    <% } %>
+                </div>
+            <% } %>
+        </div>
+    </main>
+
+    <!-- Update Stock Modal -->
+    <div id="updateStockModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%;">
+            <h2 style="margin: 0 0 20px 0;">Update Stock</h2>
+            <p id="productName" style="color: #666; margin-bottom: 20px;"></p>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Change Type</label>
+                <select id="changeType" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="StockIn">Stock In (Add)</option>
+                    <option value="StockOut">Stock Out (Remove)</option>
+                    <option value="Adjustment">Adjustment</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Quantity</label>
+                <input type="number" id="quantity" min="1" value="1" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Reason</label>
+                <textarea id="reason" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Optional reason for stock change"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button id="submitStockBtn" style="flex: 1; padding: 12px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Update Stock
+                </button>
+                <button id="cancelStockBtn" style="flex: 1; padding: 12px; background: #999; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/inventory.js"></script>
+
+<%- include('../includes/end.ejs') %>
+

@@ -175,8 +175,31 @@ exports.postLogin = async (req, res, next) => {
     req.session.userName = user.name;
     req.session.userRole = user.role ? user.role.name : 'Customer';
 
+    // Determine redirect URL based on role
+    let redirectUrl = '/customer/dashboard';
+    if (user.role) {
+      switch (user.role.name) {
+        case 'Administrator':
+          redirectUrl = '/admin/dashboard';
+          break;
+        case 'Warehouse':
+          redirectUrl = '/warehouse/dashboard';
+          break;
+        case 'Finance':
+          redirectUrl = '/payment/dashboard';
+          break;
+        case 'Delivery':
+          redirectUrl = '/warehouse/dashboard';
+          break;
+        case 'Customer':
+        default:
+          redirectUrl = '/customer/dashboard';
+      }
+    }
+
     res.status(200).json({
       message: 'Login successful',
+      redirectUrl: redirectUrl,
       user: {
         id: user.id,
         name: user.name,
@@ -200,7 +223,10 @@ exports.postLogout = (req, res, next) => {
     if (err) {
       return res.status(500).json({ error: 'Logout failed' });
     }
-    res.status(200).json({ message: 'Logout successful' });
+    res.status(200).json({
+      message: 'Logout successful',
+      redirectUrl: '/' // Redirect to welcome page
+    });
   });
 };
 

@@ -1,0 +1,249 @@
+<%- include('../includes/head.ejs') %>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .users-container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .users-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .users-header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .users-table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .users-table thead {
+            background: #f8f9fa;
+        }
+        .users-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #eee;
+        }
+        .users-table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .users-table tr:hover {
+            background: #f8f9fa;
+        }
+        .role-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .role-customer {
+            background: #e6f3ff;
+            color: #3498db;
+        }
+        .role-administrator {
+            background: #ffe6e6;
+            color: #e74c3c;
+        }
+        .role-warehouse {
+            background: #e6ffe6;
+            color: #27ae60;
+        }
+        .role-finance {
+            background: #fff3e6;
+            color: #f39c12;
+        }
+        .role-delivery {
+            background: #f0e6ff;
+            color: #9b59b6;
+        }
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-active {
+            background: #e6ffe6;
+            color: #27ae60;
+        }
+        .status-locked {
+            background: #ffe6e6;
+            color: #e74c3c;
+        }
+        .status-unverified {
+            background: #fff3e6;
+            color: #f39c12;
+        }
+        .action-btn {
+            padding: 6px 12px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-edit {
+            background: #667eea;
+            color: white;
+        }
+        .btn-edit:hover {
+            background: #5568d3;
+        }
+        .btn-lock {
+            background: #f39c12;
+            color: white;
+        }
+        .btn-lock:hover {
+            background: #e67e22;
+        }
+        .btn-unlock {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-unlock:hover {
+            background: #229954;
+        }
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+
+<body>
+    <%- include('../includes/navigation.ejs') %>
+
+    <main class="users-container">
+        <div class="users-header">
+            <div>
+                <h1>👥 User Management</h1>
+                <p>Manage users and assign roles</p>
+            </div>
+            <button id="logoutBtn" data-logout style="padding: 12px 30px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 16px;">
+                Logout
+            </button>
+        </div>
+
+        <div class="users-table-container">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (users && users.length > 0) { %>
+                        <% users.forEach(user => { %>
+                            <tr data-user-id="<%= user.id %>">
+                                <td>
+                                    <strong><%= user.name %></strong>
+                                    <br>
+                                    <small style="color: #666;">ID: <%= user.id %></small>
+                                </td>
+                                <td><%= user.email %></td>
+                                <td>
+                                    <span class="role-badge role-<%= user.role ? user.role.name.toLowerCase() : 'customer' %>">
+                                        <%= user.role ? user.role.name : 'Customer' %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <% if (user.isLocked) { %>
+                                        <span class="status-badge status-locked">🔒 Locked</span>
+                                    <% } else if (!user.emailVerified) { %>
+                                        <span class="status-badge status-unverified">⚠️ Unverified</span>
+                                    <% } else { %>
+                                        <span class="status-badge status-active">✅ Active</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <%= user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never' %>
+                                </td>
+                                <td>
+                                    <button class="action-btn btn-edit edit-role-btn"
+                                            data-user-id="<%= user.id %>"
+                                            data-user-name="<%= user.name %>"
+                                            data-current-role="<%= user.role ? user.role.id : '' %>">
+                                        📝 Edit Role
+                                    </button>
+
+                                    <% if (user.isLocked) { %>
+                                        <button class="action-btn btn-unlock toggle-lock-btn" data-user-id="<%= user.id %>">
+                                            🔓 Unlock
+                                        </button>
+                                    <% } else { %>
+                                        <button class="action-btn btn-lock toggle-lock-btn" data-user-id="<%= user.id %>">
+                                            🔒 Lock
+                                        </button>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: #999;">
+                                No users found
+                            </td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Edit Role Modal -->
+    <div id="editRoleModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%;">
+            <h2 style="margin: 0 0 20px 0;">Assign Role</h2>
+            <p id="userName" style="color: #666; margin-bottom: 20px;"></p>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Select Role</label>
+                <select id="roleSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="">-- Select Role --</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button id="saveRoleBtn" style="flex: 1; padding: 12px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Save Changes
+                </button>
+                <button id="cancelRoleBtn" style="flex: 1; padding: 12px; background: #999; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/user-management.js"></script>
+
+<%- include('../includes/end.ejs') %>
+

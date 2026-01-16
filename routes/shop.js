@@ -8,7 +8,8 @@ const adminData = require("./admin");
 
 const router = express.Router();
 
-router.get("/", shopController.getIndex);
+// Root route is now handled by app.js (welcome page)
+// Removed: router.get("/", shopController.getIndex);
 
 router.get("/product-list", shopController.getProducts);
 
