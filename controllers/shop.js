@@ -3,6 +3,11 @@ const Cart = require("../models/cart");
 
 const ERROR_PREFIX = "In shop controller, ";
 
+function renderLogin(req, res) {
+  // Render a simple login prompt page used by the app
+  return res.render('user/index', { errorMessage: 'Please login to access this page' });
+}
+
 exports.getProducts = (req, res, next) => {
   Product.findAll()
     .then((products) => {
@@ -47,8 +52,14 @@ exports.getIndex = (req, res, next) => {
 };
 
 exports.getCart = (req, res, next) => {
+  if (!req.user || typeof req.user.getCart !== 'function') {
+    return renderLogin(req, res);
+  }
   req.user.getCart()
     .then(cart => {
+      if (!cart) {
+        return res.render("shop/cart", { pageTitle: "Cart", path: "/shop/cart", products: [] });
+      }
       return cart.getProducts()
         .then(products => {
           res.render("shop/cart", {
@@ -58,10 +69,13 @@ exports.getCart = (req, res, next) => {
           });
         })
     })
-    .catch(error => { console.log('Error in shop controller, getCart {}', error) });
+    .catch(error => { console.log('Error in shop controller, getCart {}', error); renderLogin(req, res); });
 };
 
 exports.postCart = (req, res, next) => {
+  if (!req.user || typeof req.user.getCart !== 'function') {
+    return renderLogin(req, res);
+  }
   const productId = req.body.productId;
   let fetchedCart;
   let newQuantity = 1;
@@ -90,11 +104,14 @@ exports.postCart = (req, res, next) => {
     .then(() => {
       res.redirect("/cart");
     })
-    .catch(error => console.log(error));
-  
+    .catch(error => { console.log(error); renderLogin(req, res); });
+
 };
 
 exports.postCartDeleteProduct = (req, res, next) => {
+  if (!req.user || typeof req.user.getCart !== 'function') {
+    return renderLogin(req, res);
+  }
   const productId = req.body.productId;
   req.user.getCart()
     .then(cart => {
@@ -107,12 +124,15 @@ exports.postCartDeleteProduct = (req, res, next) => {
     .then(result => {
       res.redirect("/cart");
     })
-    .catch(error => console.log(error));
+    .catch(error => { console.log(error); renderLogin(req, res); });
 };
 
 exports.getOrders = (req, res, next) => {
+  if (!req.user || typeof req.user.getOrders !== 'function') {
+    return renderLogin(req, res);
+  }
   req.user
-    .getOrders({include: ['products']})
+    .getOrders({ include: [Product] })
     .then(orders => {
       res.render('shop/orders', {
         path: '/orders',
@@ -120,10 +140,13 @@ exports.getOrders = (req, res, next) => {
         orders: orders
       });
     })
-    .catch(err => console.log(err));
+    .catch(err => { console.log(err); renderLogin(req, res); });
 };
 
 exports.postOrder = (req, res, next) => {
+  if (!req.user || typeof req.user.getCart !== 'function') {
+    return renderLogin(req, res);
+  }
   let fetchedCart;
   req.user
     .getCart()
@@ -142,7 +165,7 @@ exports.postOrder = (req, res, next) => {
             })
           );
         })
-        .catch(err => console.log(err));
+        .catch(err => { console.log(err); renderLogin(req, res); });
     })
     .then(result => {
       return fetchedCart.setProducts(null);
@@ -150,8 +173,5 @@ exports.postOrder = (req, res, next) => {
     .then(result => {
       res.redirect('/orders');
     })
-    .catch(err => console.log(err));
+    .catch(err => { console.log(err); renderLogin(req, res); });
 };
-
-
-

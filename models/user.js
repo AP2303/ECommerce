@@ -1,5 +1,6 @@
 const Sequelize = require("sequelize");
 const sequelize = require("../util/database");
+const bcrypt = require('bcrypt');
 
 const User = sequelize.define("user", {
   id: {
@@ -56,6 +57,27 @@ const User = sequelize.define("user", {
   lastLoginAt: {
     type: Sequelize.DATE,
     allowNull: true
+  }
+});
+
+// Helper to decide if a password string looks like a bcrypt hash
+function looksLikeBcryptHash(pw) {
+  return typeof pw === 'string' && pw.startsWith('$2') && pw.length >= 60;
+}
+
+// Sequelize hooks to hash password before create/update
+User.beforeCreate(async (user, options) => {
+  if (user.password && !looksLikeBcryptHash(user.password)) {
+    const hashed = await bcrypt.hash(user.password, 12);
+    user.password = hashed;
+  }
+});
+
+User.beforeUpdate(async (user, options) => {
+  // Only hash if password was changed and doesn't already look hashed
+  if (user.changed('password') && user.password && !looksLikeBcryptHash(user.password)) {
+    const hashed = await bcrypt.hash(user.password, 12);
+    user.password = hashed;
   }
 });
 

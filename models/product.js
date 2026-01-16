@@ -16,7 +16,6 @@ const Product = sequelize.define("product", {
   sku: {
     type: Sequelize.STRING,
     allowNull: true,
-    unique: true,
     comment: 'Stock Keeping Unit'
   },
   price: {
@@ -45,8 +44,16 @@ const Product = sequelize.define("product", {
   lowStockThreshold: {
     type: Sequelize.INTEGER,
     defaultValue: 10,
-    comment: 'Alert when stock falls below this value'
+    comment: 'Alert when stock falls below this value',
+    field: 'low_stock_threshold'
   }
+}, {
+  indexes: [
+    {
+      unique: true,
+      fields: ['sku']
+    }
+  ]
 });
 
 module.exports = Product;

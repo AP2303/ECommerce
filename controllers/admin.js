@@ -1,6 +1,11 @@
 const Product = require("../models/product");
 
+function renderLogin(req, res) {
+  return res.render('user/index', { errorMessage: 'Please login to access admin pages' });
+}
+
 exports.getAddProduct = (req, res, next) => {
+  if (!req.user) return renderLogin(req, res);
   res.render("admin/edit-product", {
     pageTitle: "Add Product",
     path: "/admin/add-product",
@@ -9,10 +14,7 @@ exports.getAddProduct = (req, res, next) => {
 };
 
 exports.getEditProduct = (req, res, next) => {
-  // const editMode = req.query.edit;
-  // if (!editMode){
-  //   return res.redirect('/')
-  // }
+  if (!req.user) return renderLogin(req, res);
   const productId = req.params.productId;
   req.user.getProducts({ where: {id: productId} })
     .then((products) => {
@@ -33,6 +35,7 @@ exports.getEditProduct = (req, res, next) => {
 };
 
 exports.postAddProduct = (req, res, next) => {
+  if (!req.user) return renderLogin(req, res);
   const title = req.body.title;
   const imageUrl = req.body.imageUrl;
   const description = req.body.description;
@@ -54,6 +57,7 @@ exports.postAddProduct = (req, res, next) => {
 };
 
 exports.postEditProduct = (req, res, next) => {
+  if (!req.user) return renderLogin(req, res);
   const id = req.body.productId;
 
   Product.findByPk(id)
@@ -74,6 +78,7 @@ exports.postEditProduct = (req, res, next) => {
 };
 
 exports.getProducts = (req, res, next) => {
+  if (!req.user || typeof req.user.getProducts !== 'function') return renderLogin(req, res);
   req.user.getProducts()
     .then((products) => {
       res.render("admin/product-list", {
@@ -89,6 +94,7 @@ exports.getProducts = (req, res, next) => {
 };
 
 exports.deleteProduct = (req, res, next) => {
+  if (!req.user) return renderLogin(req, res);
   const productId = req.body.productId;
   Product.findByPk(productId)
     .then((product) => {

@@ -61,6 +61,39 @@ app.use(morgan('combined', {stream: accessLogStream}));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 
+// Load user from session into req.user. In development, fall back to a seeded customer or any user so controllers don't crash.
+app.use(async (req, res, next) => {
+  try {
+    if (req.session && req.session.userId) {
+      const user = await User.findByPk(req.session.userId);
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      // Prefer the seeded customer account if present
+      let user = await User.findOne({ where: { email: 'customer@bookstore.com' } }).catch(() => null);
+      if (!user) {
+        // fallback to any user in the DB
+        user = await User.findOne().catch(() => null);
+      }
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+
+    // No user available; set to null so controllers can handle gracefully
+    req.user = null;
+    next();
+  } catch (err) {
+    console.error('Error in user-loading middleware:', err);
+    next(err);
+  }
+});
+
 // Commented out old user middleware - will use authentication from /auth routes instead
 /*
 app.use((req, res, next) => {
@@ -163,9 +196,49 @@ Inventory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 Product.hasMany(Inventory, { foreignKey: 'productId', as: 'inventoryHistory' });
 
 // Sync database and start server
-sequelize
-  .sync()
-  .then(() => {
+const migrator = require('./util/migrator');
+
+async function startServer() {
+  try {
+    const runMigrations = process.env.DB_RUN_MIGRATIONS === 'true';
+    const autoMigrate = process.env.DB_AUTO_MIGRATE === 'true';
+
+    if (runMigrations) {
+      console.log('DB_RUN_MIGRATIONS=true; running pending migrations (umzug)');
+      await migrator.up();
+      console.log('Migrations applied');
+    } else if (autoMigrate) {
+      console.log('DB_AUTO_MIGRATE=true; running sequelize.sync({ alter: true })');
+      await sequelize.sync({ alter: true });
+      console.log('Auto-migration complete');
+    } else {
+      await sequelize.authenticate();
+    }
+
+    // Development-only seed: ensure at least one user and roles exist so req.user fallback works
+    if (process.env.NODE_ENV !== 'production') {
+      const userCount = await User.count();
+      if (userCount === 0) {
+        console.log('No users found in DB — creating default roles and users for development');
+        const roles = [
+          { name: 'Customer', description: 'Regular customer' },
+          { name: 'Administrator', description: 'Admin user' },
+          { name: 'Warehouse', description: 'Inventory manager' },
+          { name: 'Finance', description: 'Finance role' },
+          { name: 'Delivery', description: 'Delivery role' }
+        ];
+        for (const r of roles) {
+          await Role.findOrCreate({ where: { name: r.name }, defaults: r });
+        }
+        const adminRole = await Role.findOne({ where: { name: 'Administrator' } });
+        const customerRole = await Role.findOne({ where: { name: 'Customer' } });
+
+        await User.findOrCreate({ where: { email: 'admin@bookstore.com' }, defaults: { name: 'Admin User', email: 'admin@bookstore.com', password: 'admin123', roleId: adminRole.id, emailVerified: true } });
+        await User.findOrCreate({ where: { email: 'customer@bookstore.com' }, defaults: { name: 'Test Customer', email: 'customer@bookstore.com', password: 'customer123', roleId: customerRole.id, emailVerified: true } });
+        console.log('Default dev users created (admin@bookstore.com / admin123, customer@bookstore.com / customer123)');
+      }
+    }
+
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
       console.log(`✓ Server is running on port ${PORT}`);
@@ -182,8 +255,10 @@ sequelize
       console.log(`  /admin/* - Admin`);
       console.log(`  /* - Shop`);
     });
-  })
-  .catch((error) => {
-    console.error("Failed to start server:", error);
+  } catch (error) {
+    console.error('Failed to start server:', error);
     process.exit(1);
-  });
+  }
+}
+
+startServer();
