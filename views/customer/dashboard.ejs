@@ -123,6 +123,82 @@
             background: #fff3e6;
             color: #f39c12;
         }
+        /* Additional styles for product grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .card__header {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .card__image {
+            text-align: center;
+            padding: 15px;
+        }
+        .card__content {
+            padding: 15px;
+        }
+        .card__actions {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        /* Quick view modal styles */
+        #quickview-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+        }
+        #quickview-modal > div {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: auto;
+            position: relative;
+        }
+        #quickview-close {
+            position: absolute;
+            right: 14px;
+            top: 14px;
+            border: none;
+            background: #eee;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -158,10 +234,52 @@
         <div class="quick-actions">
             <h2>Quick Actions</h2>
             <div class="action-buttons">
-                <a href="/product-list" class="action-btn">📚 Browse Products</a>
-                <a href="/cart" class="action-btn">🛒 View Cart</a>
-                <a href="/orders" class="action-btn">📦 My Orders</a>
-                <a href="/categories" class="action-btn">📂 Categories</a>
+                <a href="/product-list" class="action-btn">Browse Products</a>
+                <a href="/cart" class="action-btn">View Cart</a>
+                <a href="/orders" class="action-btn">My Orders</a>
+                <a href="/categories" class="action-btn">All Categories</a>
+            </div>
+        </div>
+
+        <!-- Categories (minimal) -->
+        <%- include('../includes/categories.ejs') %>
+
+        <!-- Products grid on dashboard -->
+        <section style="margin-top:30px">
+            <h2 style="margin:0 0 12px 0;">Featured Books</h2>
+            <div class="grid">
+                <% if (products && products.length > 0) { %>
+                    <% products.forEach(product => { %>
+                        <article class="card product-item">
+                            <header class="card__header"><h3><%= product.title %></h3></header>
+                            <div class="card__image">
+                                <% let imgSrc = '/images/placeholder.svg'; if (product.imageUrl) { const v = String(product.imageUrl).trim(); if (v.indexOf('http')===0) { imgSrc = '/images/proxy?src=' + encodeURIComponent(v); } else if (v.indexOf('/')===0) { imgSrc = v; } else { imgSrc = '/images/' + v; } } %>
+                                <img src="<%= imgSrc %>" alt="<%= product.title %>" class="js-img-fallback" data-placeholder="/images/placeholder.svg" style="width:160px;height:220px;object-fit:cover;">
+                            </div>
+                            <div class="card__content">
+                                <p style="font-weight:700;">$<%= product.price %></p>
+                                <p style="color:#666;">Stock: <%= product.stock %></p>
+                            </div>
+                            <div class="card__actions">
+                                <button class="btn js-quickview" data-productid="<%= product.id %>">Quick View</button>
+                                <form action="/cart" method="POST" style="display:inline">
+                                    <input type="hidden" name="productId" value="<%= product.id %>">
+                                    <button class="btn">Add to Cart</button>
+                                </form>
+                            </div>
+                        </article>
+                    <% }) %>
+                <% } else { %>
+                    <p>No products available</p>
+                <% } %>
+            </div>
+        </section>
+
+        <!-- Quick view modal -->
+        <div id="quickview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;z-index:1200;">
+            <div style="background:#fff;padding:20px;border-radius:8px;width:90%;max-width:900px;max-height:90vh;overflow:auto;position:relative;">
+                <button id="quickview-close" style="position:absolute;right:14px;top:14px;border:none;background:#eee;padding:8px;border-radius:6px;cursor:pointer;">Close</button>
+                <div id="quickview-content"></div>
             </div>
         </div>
 
@@ -196,4 +314,3 @@
 
 
 <%- include('../includes/end.ejs') %>
-

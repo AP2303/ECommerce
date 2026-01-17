@@ -1,4 +1,7 @@
 const Product = require("../models/product");
+const Order = require('../models/order');
+const User = require('../models/user');
+const OrderItem = require('../models/order-item');
 
 function renderLogin(req, res) {
   return res.render('user/index', { errorMessage: 'Please login to access admin pages' });
@@ -91,6 +94,28 @@ exports.getProducts = (req, res, next) => {
     .catch((error) =>
       console.log("Error in Admin Controller, getProducts: {}", error)
     );
+};
+
+// orders listing
+exports.getOrders = async (req, res) => {
+  if (!req.user) return renderLogin(req, res);
+  try {
+    const status = req.query.status;
+    const where = {};
+    if (status) where.status = status.charAt(0).toUpperCase() + status.slice(1);
+    const orders = await Order.findAll({
+      where,
+      order: [['createdAt','DESC']],
+      include: [
+        { model: User, attributes: ['id','name','email'] },
+        { model: OrderItem, as: 'orderItems', include: [{ model: Product, as: 'product' }] }
+      ]
+    });
+    res.render('admin/orders', { pageTitle: 'Orders', path: '/admin/orders', orders });
+  } catch (err) {
+    console.error('Admin getOrders error:', err);
+    res.status(500).render('500', { error: 'Failed to load orders' });
+  }
 };
 
 exports.deleteProduct = (req, res, next) => {

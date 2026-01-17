@@ -52,9 +52,109 @@ app.set("views", "views");
 // parse incoming JSON for fetch requests
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+
+const { URL } = require('url');
+// Simple image proxy for allowlisted hosts to bypass strict CSP (development helper)
+// Register this BEFORE static so it is matched reliably and to provide diagnostics.
+app.get('/images/proxy', async (req, res) => {
+  try {
+    let src = req.query.src;
+    console.log('Image proxy hit, raw src=', src);
+    if (!src) return res.status(400).send('Missing src');
+
+    // Sometimes src can be double-encoded; decode once safely
+    try { src = decodeURIComponent(src); } catch (e) { /* ignore */ }
+
+    let parsed;
+    try {
+      parsed = new URL(src);
+    } catch (e) {
+      console.warn('Image proxy invalid URL:', src);
+      return res.status(400).send('Invalid URL');
+    }
+
+    const allowedHosts = [
+      'covers.openlibrary.org',
+      'images.unsplash.com',
+      'cdn.pixabay.com',
+      'upload.wikimedia.org'
+    ];
+
+    console.log('Image proxy request for host:', parsed.hostname);
+    // Allow exact matches or openlibrary subdomains
+    const isAllowed = allowedHosts.includes(parsed.hostname) || parsed.hostname.endsWith('.openlibrary.org') || parsed.hostname === 'openlibrary.org';
+    if (!isAllowed) {
+      console.warn('Image proxy blocked host:', parsed.hostname);
+      return res.status(403).send('Host not allowed');
+    }
+
+    // Fetch with a minimal user-agent and accept headers to improve compatibility
+    const fetchRes = await fetch(src, {
+      headers: {
+        'User-Agent': 'BookLabStore/1.0 (+https://localhost)',
+        'Accept': 'image/*,*/*;q=0.8'
+      },
+      redirect: 'follow'
+    });
+    console.log('Image proxy remote status:', fetchRes.status, 'for', src);
+    if (!fetchRes.ok) {
+      console.warn('Image proxy fetch failed:', fetchRes.status, src);
+      if (fetchRes.status === 404) {
+        // Return local placeholder image instead of 404 so browser receives an image
+        const placeholderPath = path.join(__dirname, 'public', 'images', 'placeholder.svg');
+        if (fs.existsSync(placeholderPath)) {
+          res.setHeader('Content-Type', 'image/svg+xml');
+          return fs.createReadStream(placeholderPath).pipe(res);
+        }
+        return res.status(404).send('Remote image not found');
+      }
+      return res.status(502).send('Failed to fetch image');
+    }
+
+    const contentType = fetchRes.headers.get('content-type') || '';
+    console.log('Image proxy remote content-type:', contentType);
+    // Ensure remote is an image
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      console.warn('Image proxy remote content-type not an image:', contentType, src);
+      return res.status(415).send('Remote resource is not an image');
+    }
+    res.setHeader('Content-Type', contentType);
+    // cache for a day
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    // Stream the image
+    const body = fetchRes.body;
+    if (body && body.pipe) {
+      return body.pipe(res);
+    }
+
+    const arrayBuffer = await fetchRes.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err) {
+    console.error('Image proxy error:', err);
+    res.status(500).send('Proxy error');
+  }
+});
+
+// Diagnostic endpoint to test proxy fetch capability
+app.get('/images/proxy-test', async (req, res) => {
+  try {
+    const testUrl = 'https://covers.openlibrary.org/b/id/11153255-L.jpg';
+    console.log('Proxy-test fetching', testUrl);
+    const fetchRes = await fetch(testUrl, { headers: { 'User-Agent': 'BookLabStore/1.0' } });
+    const status = fetchRes.status;
+    const contentType = fetchRes.headers.get('content-type') || '';
+    const length = fetchRes.headers.get('content-length') || 'unknown';
+    res.json({ status, contentType, length });
+  } catch (err) {
+    console.error('Proxy-test error', err);
+    res.status(500).json({ error: 'proxy-test-failed', message: String(err) });
+  }
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
-// quick login/logout endpoints (front-end uses these paths)
+// Quick login/logout endpoints (front-end uses these paths)
 app.post('/login', authController.postLogin);
 app.post('/logoutnow', authController.postLogout);
 
@@ -120,6 +220,17 @@ app.get('/', (req, res) => {
   });
 });
 
+// Development-only debug endpoint to inspect session/user (do not enable in production)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug/whoami', (req, res) => {
+    return res.json({
+      session: req.session || null,
+      user: req.user ? { id: req.user.id, email: req.user.email, role: req.user.role ? req.user.role.name : null } : null,
+      localsRole: res.locals.currentRole || null
+    });
+  });
+}
+
 // Auth page routes - accessible even if logged in (will show appropriate message)
 app.get('/login', (req, res) => {
   const errors = req.flash ? req.flash('error') : [];
@@ -144,6 +255,7 @@ app.get('/customer/dashboard', roleAuth.ensureAuthenticated, dashboardController
 app.get('/admin/dashboard', roleAuth.ensureAdmin, dashboardController.getAdminDashboard);
 app.get('/warehouse/dashboard', roleAuth.ensureRoles(['Warehouse', 'Administrator']), dashboardController.getWarehouseDashboard);
 app.get('/payment/dashboard', roleAuth.ensureRoles(['Finance', 'Administrator']), dashboardController.getFinanceDashboard);
+app.get('/delivery/dashboard', roleAuth.ensureRoles(['Delivery', 'Administrator']), dashboardController.getDeliveryDashboard);
 
 // API routes
 app.get('/api/roles', roleAuth.ensureAdmin, userController.getRoles);
@@ -152,6 +264,7 @@ app.get('/api/roles', roleAuth.ensureAdmin, userController.getRoles);
 app.use('/admin', roleAuth.ensureAdmin, adminRoutes);
 app.use('/warehouse', roleAuth.ensureRoles(['Warehouse', 'Administrator']), warehouseRoutes);
 app.use('/payment', roleAuth.ensureRoles(['Finance', 'Administrator']), paymentRoutes);
+app.use('/delivery', roleAuth.ensureRoles(['Delivery', 'Administrator']), require('./routes/delivery'));
 app.use("/auth", authRoutes);
 app.use("/categories", categoryRoutes);
 app.use(shopRoutes);
@@ -190,13 +303,20 @@ User.hasMany(Order, { foreignKey: 'userId' });
 Order.belongsToMany(Product, { through: OrderItem, foreignKey: 'orderId' });
 Product.belongsToMany(Order, { through: OrderItem, foreignKey: 'productId' });
 
+// Ensure direct OrderItem associations exist for easier includes
+Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'orderItems' });
+OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
+OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Product.hasMany(OrderItem, { foreignKey: 'productId', as: 'orderItems' });
+
 // Order-Payment relationship (one-to-one)
 Order.hasOne(Payment, { foreignKey: 'orderId', as: 'payment' });
 Payment.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 
 // Order-Shipment relationship (one-to-one)
-Order.hasOne(Shipment, { foreignKey: 'orderId', as: 'shipment' });
-Shipment.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+// Use explicit foreignKey object with name and field to match existing DB column 'orderId'
+Order.hasOne(Shipment, { foreignKey: { name: 'orderId', field: 'orderId' }, as: 'shipment' });
+Shipment.belongsTo(Order, { foreignKey: { name: 'orderId', field: 'orderId' }, as: 'order' });
 
 // Product-Inventory relationship (inventory log)
 Inventory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
@@ -300,3 +420,4 @@ async function startServer() {
 }
 
 startServer();
+

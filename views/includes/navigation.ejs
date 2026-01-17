@@ -1,42 +1,84 @@
 <div class="backdrop"></div>
+<% /* Use a safe fallback for path so error pages that don't pass `path` won't crash */ %>
+<% const localPath = (typeof path === 'string') ? path : ''; %>
+<% const isDashboard = (localPath.indexOf('/admin') === 0 || localPath.indexOf('/customer') === 0 || localPath.indexOf('/warehouse') === 0 || localPath.indexOf('/payment') === 0 || localPath.indexOf('/delivery') === 0); %>
 <header class="main-header">
-    <button id="side-menu-toggle">Menu</button>
+  <% if (isDashboard) { %>
+    <div class="main-header__brand" style="display:flex; align-items:center; gap:12px; padding:12px 18px;">
+      <a href="/" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+        <img src="/images/logo.svg" alt="Book Lab Store" style="height:36px; width:auto; display:block;">
+        <span style="font-weight:700; margin-left:6px; font-size:18px; color:#222;">Book Lab Store</span>
+      </a>
+    </div>
+    <nav class="main-header__nav" style="margin-left:auto;">
+      <ul class="main-header__item-list" style="display:flex; gap:10px; align-items:center;">
+        <% if (locals.isAuthenticated) { %>
+          <li class="main-header__item" style="list-style:none;">
+            <span style="color:#666; margin-right:10px;">Hi, <%= locals.currentUser ? locals.currentUser.name : 'User' %></span>
+          </li>
+          <li class="main-header__item" style="list-style:none;">
+            <button id="logout" class="" style="padding:8px 12px; border-radius:6px; border:none; background:#eee; cursor:pointer;">Log Out</button>
+          </li>
+        <% } else { %>
+          <li class="main-header__item" style="list-style:none;">
+            <a href="/login">Log In</a>
+          </li>
+          <li class="main-header__item" style="list-style:none;">
+            <a href="/register" style="background: #667eea; color: white; padding: 8px 12px; border-radius: 6px; text-decoration: none;">Sign Up</a>
+          </li>
+        <% } %>
+      </ul>
+    </nav>
+  <% } else { %>
+    <div class="main-header__left" style="display:flex; align-items:center; gap:12px; padding:12px 18px;">
+      <a href="/" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+        <img src="/images/logo.svg" alt="Book Lab Store" style="height:36px; width:auto; display:block;">
+        <span style="font-weight:700; margin-left:6px; font-size:18px; color:#222;">Book Lab Store</span>
+      </a>
+    </div>
     <nav class="main-header__nav">
         <ul class="main-header__item-list">
             <li class="main-header__item">
-                <a class="<%= path === '/' ? 'active' : '' %>" href="/">Shop</a>
+                <a class="<%= localPath === '/' ? 'active' : '' %>" href="/">Shop</a>
             </li>
             <li class="main-header__item">
-                <a class="<%= path === '/shop/product-list' ? 'active' : '' %>" href="/product-list">Products</a>
+                <a class="<%= localPath === '/shop/product-list' ? 'active' : '' %>" href="/product-list">Products</a>
             </li>
             <li class="main-header__item">
-                <a class="<%= path === '/shop/cart' ? 'active' : '' %>" href="/cart">Cart</a>
+                <a class="<%= localPath === '/shop/cart' ? 'active' : '' %>" href="/cart">Cart</a>
             </li>
             <li class="main-header__item">
-                <a class="<%= path === '/shop/orders' ? 'active' : '' %>" href="/orders">Orders</a>
+                <a class="<%= localPath === '/shop/orders' ? 'active' : '' %>" href="/orders">Orders</a>
             </li>
 
             <% if (locals.isAuthenticated && locals.currentRole === 'Administrator') { %>
             <li class="main-header__item">
-                <a class="<%= path === '/admin/add-product' ? 'active' : '' %>" href="/admin/add-product">Add Product
+                <a class="<%= localPath === '/admin/add-product' ? 'active' : '' %>" href="/admin/add-product">Add Product
                 </a>
             </li>
             <li class="main-header__item">
-                <a class="<%= path === '/admin/product-list' ? 'active' : '' %>" href="/admin/product-list">Admin Products
+                <a class="<%= localPath === '/admin/product-list' ? 'active' : '' %>" href="/admin/product-list">Admin Products
                 </a>
             </li>
             <% } %>
 
             <% if (locals.isAuthenticated && (locals.currentRole === 'Warehouse' || locals.currentRole === 'Administrator')) { %>
             <li class="main-header__item">
-                <a class="<%= path === '/warehouse/inventory' ? 'active' : '' %>" href="/warehouse/inventory">Inventory
+                <a class="<%= localPath === '/warehouse/inventory' ? 'active' : '' %>" href="/warehouse/inventory">Inventory
                 </a>
             </li>
             <% } %>
 
             <% if (locals.isAuthenticated && (locals.currentRole === 'Finance' || locals.currentRole === 'Administrator')) { %>
             <li class="main-header__item">
-                <a class="<%= path === '/payment/dashboard' ? 'active' : '' %>" href="/payment/dashboard">Payments
+                <a class="<%= localPath === '/payment/dashboard' ? 'active' : '' %>" href="/payment/dashboard">Payments
+                </a>
+            </li>
+            <% } %>
+
+            <% if (locals.isAuthenticated && (locals.currentRole === 'Delivery' || locals.currentRole === 'Administrator')) { %>
+            <li class="main-header__item">
+                <a class="<%= localPath === '/delivery/dashboard' ? 'active' : '' %>" href="/delivery/dashboard">Delivery
                 </a>
             </li>
             <% } %>
@@ -58,32 +100,47 @@
             <% } %>
         </ul>
     </nav>
+  <% } %>
 </header>
 
 <nav class="mobile-nav">
+    <% if (isDashboard) { %>
+        <ul class="mobile-nav__item-list" style="display:flex; gap:12px; padding:12px;">
+            <li class="mobile-nav__item"><a href="/">Home</a></li>
+            <% if (locals.isAuthenticated && (locals.currentRole === 'Delivery' || locals.currentRole === 'Administrator')) { %>
+              <li class="mobile-nav__item"><a href="/delivery/dashboard">Delivery</a></li>
+            <% } %>
+            <% if (locals.isAuthenticated) { %>
+              <li class="mobile-nav__item"><button id="logout" style="border:none;background:#eee;padding:8px 10px;border-radius:6px;">Logout</button></li>
+            <% } else { %>
+              <li class="mobile-nav__item"><a href="/login">Login</a></li>
+            <% } %>
+        </ul>
+    <% } else { %>
         <ul class="mobile-nav__item-list">
                 <li class="mobile-nav__item">
-                    <a class="<%= path === '/' ? 'active' : '' %>" href="/">Shop</a>
+                    <a class="<%= localPath === '/' ? 'active' : '' %>" href="/">Shop</a>
                 </li>
                 <li class="mobile-nav__item">
-                    <a class="<%= path === '/products' ? 'active' : '' %>" href="/product-list">Products</a>
+                    <a class="<%= localPath === '/products' ? 'active' : '' %>" href="/product-list">Products</a>
                 </li>
                 <li class="mobile-nav__item">
-                    <a class="<%= path === '/cart' ? 'active' : '' %>" href="/cart">Cart</a>
+                    <a class="<%= localPath === '/cart' ? 'active' : '' %>" href="/cart">Cart</a>
                 </li>
                 <li class="mobile-nav__item">
-                    <a class="<%= path === '/orders' ? 'active' : '' %>" href="/orders">Orders</a>
+                    <a class="<%= localPath === '/orders' ? 'active' : '' %>" href="/orders">Orders</a>
                 </li>
                 <% if (locals.isAuthenticated && locals.currentRole === 'Administrator') { %>
                 <li class="mobile-nav__item">
-                    <a class="<%= path === '/admin/add-product' ? 'active' : '' %>" href="/admin/add-product">Add Product
+                    <a class="<%= localPath === '/admin/add-product' ? 'active' : '' %>" href="/admin/add-product">Add Product
                     </a>
                 </li>
                 <li class="mobile-nav__item">
-                    <a class="<%= path === '/admin/products' ? 'active' : '' %>" href="/admin/product-list">Admin Products
+                    <a class="<%= localPath === '/admin/products' ? 'active' : '' %>" href="/admin/product-list">Admin Products
                     </a>
                 </li>
                 <% } %>
             </ul>
+    <% } %>
 </nav>
 <!-- Logout functionality handled by /js/main.js -->

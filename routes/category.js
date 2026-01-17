@@ -7,7 +7,7 @@ const categoryController = require("../controllers/category");
  */
 
 // GET /categories - Get all active categories (public)
-router.get("/", categoryController.getCategories);
+router.get("/", categoryController.getAllPublic);
 
 // GET /categories/:id - Get single category with products (public)
 router.get("/:id", categoryController.getCategory);
@@ -22,4 +22,3 @@ router.put("/:id", categoryController.putUpdateCategory);
 router.delete("/:id", categoryController.deleteCategory);
 
 module.exports = router;
-

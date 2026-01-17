@@ -1,0 +1,25 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .categories-grid { display:flex; gap:12px; flex-wrap:wrap; margin: 18px 0; }
+  .category-card { background: #fff; border:1px solid #eee; padding:10px 14px; border-radius:8px; min-width:140px; text-align:center; font-weight:600; color:#333; text-decoration:none; }
+  .category-card:hover { background:#f7f9ff; transform:translateY(-2px); }
+</style>
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main style="max-width:1000px;margin:20px auto;padding:20px;">
+    <h2 style="margin:0 0 10px 0;">Categories</h2>
+    <p style="color:#666;margin:0 0 16px 0;">Browse categories to find books.</p>
+
+    <div class="categories-grid">
+      <% if (categories && categories.length > 0) { %>
+        <% categories.forEach(cat => { %>
+          <a href="/categories/<%= cat.id %>" class="category-card"><%= cat.name %></a>
+        <% }) %>
+      <% } else { %>
+        <div style="color:#999; padding:20px;">No categories yet</div>
+      <% } %>
+    </div>
+  </main>
+<%- include('../includes/end.ejs') %>

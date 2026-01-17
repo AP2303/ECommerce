@@ -48,6 +48,13 @@ const Shipment = sequelize.define('shipment', {
     type: Sequelize.DATE,
     allowNull: true
   },
+  // Explicit orderId so Sequelize uses this DB column name (mixed-case DB)
+  orderId: {
+    type: Sequelize.INTEGER,
+    allowNull: true,
+    field: 'orderId',
+    comment: 'Foreign key to orders.id (DB column is orderId)'
+  },
   shippingAddress: {
     type: Sequelize.JSON,
     allowNull: true,
@@ -57,7 +64,9 @@ const Shipment = sequelize.define('shipment', {
     type: Sequelize.TEXT,
     allowNull: true
   }
+}, {
+  // DB uses mixed-case column names (orderId etc). Do not auto-convert to snake_case.
+  underscored: false
 });
 
 module.exports = Shipment;
-

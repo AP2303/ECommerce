@@ -220,7 +220,8 @@ exports.redirectIfAuthenticated = (req, res, next) => {
         case 'Finance':
           return res.redirect('/payment/dashboard');
         case 'Delivery':
-          return res.redirect('/warehouse/dashboard');
+          // Delivery users should be redirected to delivery dashboard
+          return res.redirect('/delivery/dashboard');
         case 'Customer':
         default:
           return res.redirect('/customer/dashboard');
@@ -230,4 +231,3 @@ exports.redirectIfAuthenticated = (req, res, next) => {
   }
   next();
 };
-

@@ -16,7 +16,20 @@
                                     </h1>
                                 </header>
                                 <div class="card__image">
-                                    <img src="<%= product.imageUrl %>" alt="<%= product.title %>">
+                                    <%
+                                        let imageSrc = '/images/placeholder.svg';
+                                        if (product.imageUrl) {
+                                          const v = String(product.imageUrl).trim();
+                                          if (v.indexOf('http') === 0) {
+                                            imageSrc = '/images/proxy?src=' + encodeURIComponent(v);
+                                          } else if (v.indexOf('/') === 0) {
+                                            imageSrc = v;
+                                          } else {
+                                            imageSrc = '/images/' + v;
+                                          }
+                                        }
+                                    %>
+                                    <img src="<%= imageSrc %>" alt="<%= product.title %>" width="300" height="420" class="js-img-fallback" data-placeholder="/images/placeholder.svg">
                                 </div>
                                 <div class="card__content">
                                     <h2 class="product__price">$

@@ -1,0 +1,41 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main style="max-width:1100px;margin:20px auto;padding:20px;">
+    <h1>Orders Ready to Pack</h1>
+    <p style="color:#666;">Orders marked as <strong>Paid</strong> and waiting to be packed.</p>
+
+    <% if (orders && orders.length) { %>
+      <table style="width:100%;border-collapse:collapse;margin-top:12px;background:#fff;">
+        <thead>
+          <tr style="background:#f8f9fa;text-align:left;">
+            <th style="padding:10px;">Order #</th>
+            <th style="padding:10px;">Date</th>
+            <th style="padding:10px;">Total</th>
+            <th style="padding:10px;">Customer</th>
+            <th style="padding:10px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(o => { %>
+            <tr style="border-bottom:1px solid #eee;">
+              <td style="padding:10px;"><a href="/admin/orders/<%= o.id %>"><%= o.orderNumber || o.id %></a></td>
+              <td style="padding:10px;"><%= new Date(o.createdAt).toLocaleString() %></td>
+              <td style="padding:10px;">$<%= (o.totalAmount || 0).toFixed(2) %></td>
+              <td style="padding:10px;"><%= o.user ? (o.user.name || o.user.email) : o.userId %></td>
+              <td style="padding:10px;">
+                <form method="post" action="/warehouse/pack-order/<%= o.id %>" style="display:inline;">
+                  <button type="submit" style="padding:8px 12px;border-radius:6px;border:none;background:#27ae60;color:#fff;cursor:pointer;">Mark Packed</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p>No orders ready to pack.</p>
+    <% } %>
+  </main>
+<%- include('../includes/end.ejs') %>

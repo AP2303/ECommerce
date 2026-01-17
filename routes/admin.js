@@ -25,6 +25,10 @@ router.get("/product-list", adminController.getProducts);
 // /admin/delete-product => POST
 router.post("/delete-product", adminController.deleteProduct);
 
+// Orders
+// /admin/orders => GET (optional ?status=)
+router.get('/orders', adminController.getOrders);
+
 // User Management Routes
 // /admin/users => GET - List all users
 router.get("/users", userController.getUsers);

@@ -4,24 +4,29 @@
 
     <body>
         <%- include('../includes/navigation.ejs') %>
-        <main>
+        <main class="dashboard-container" style="max-width:1000px;margin:20px auto;padding:20px;">
+            <h2>Your Cart</h2>
             <% if (products.length > 0) { %>
                 <ul class="cart__item-list">
                     <% products.forEach(p => { %>
-                        <li class="cart__item">
-                            <h1><%= p.title %></h1>
-                            <h2>Quantity: <%= p.cartItem.quantity %></h2>
-                            <form action="/cart-delete-item" method="POST">
-                                <input type="hidden" value="<%= p.id %>" name="productId">
-                                <button class="btn danger" type="submit">Delete</button>
-                            </form>
+                        <li class="cart__item" style="display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid #eee;border-radius:8px;margin-bottom:10px;">
+                            <div>
+                              <h3><%= p.title %></h3>
+                              <p style="color:#666;">Quantity: <%= p.cartItem.quantity %></p>
+                            </div>
+                            <div>
+                              <form action="/cart-delete-item" method="POST">
+                                  <input type="hidden" value="<%= p.id %>" name="productId">
+                                  <button class="btn danger" type="submit">Delete</button>
+                              </form>
+                            </div>
                         </li>
                     <% }) %>
                 </ul>
                 <hr>
                 <div class="centered">
                     <form action="/create-order" method="POST">
-                        <button type="submit" class="btn">Order Now!</button> 
+                        <button type="submit" class="btn">Order Now!</button>
                     </form>
                 </div>
             <% } else { %>

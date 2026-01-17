@@ -3,22 +3,27 @@
 
     <body>
         <%- include('../includes/navigation.ejs') %>
-        <main>
+        <main class="dashboard-container" style="max-width:1000px;margin:20px auto;padding:20px;">
+            <h2>My Orders</h2>
             <% if (orders.length <= 0) { %>
-                <h1>Nothing there!</h1>
+                <div style="color:#999;padding:40px;text-align:center;">You have no orders yet.</div>
             <% } else { %>
-                <ul>
+                <div style="display:grid;gap:12px;">
                     <% orders.forEach(order => { %>
-                        <li>
-                            <h1># <%= order.id %></h1>
-                            <ul>
+                        <div style="border:1px solid #eee;padding:12px;border-radius:8px;">
+                            <h3># <%= order.id %> — <span style="color:#666;font-weight:600;">$<%= (order.totalAmount||0).toFixed(2) %></span></h3>
+                            <p style="color:#666;margin:6px 0;">Placed on: <%= new Date(order.createdAt).toLocaleString() %></p>
+                            <div>
+                                <strong>Items:</strong>
+                                <ul>
                                 <% order.products.forEach(product => { %>
                                     <li><%= product.title %> (<%= product.orderItem.quantity %>)</li>
                                 <% }); %>
-                            </ul>
-                        </li>
+                                </ul>
+                            </div>
+                        </div>
                     <% }); %>
-                </ul>
+                </div>
             <% } %>
         </main>
         <%- include('../includes/end.ejs') %>

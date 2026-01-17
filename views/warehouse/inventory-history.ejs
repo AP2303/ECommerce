@@ -1,0 +1,50 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .history-container { max-width:1100px; margin:20px auto; padding:20px; }
+  .history-table { width:100%; border-collapse: collapse; background:#fff; border-radius:8px; overflow:hidden; }
+  .history-table th { text-align:left; padding:12px; background:#f8f9fa; border-bottom:1px solid #eee; }
+  .history-table td { padding:12px; border-bottom:1px solid #eee; }
+  .small-muted { color:#777; font-size:13px; }
+</style>
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main class="history-container">
+    <h1>Inventory History</h1>
+    <p class="small-muted">Last 100 inventory changes recorded.</p>
+
+    <% if (history && history.length) { %>
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Product</th>
+            <th>Type</th>
+            <th>Quantity</th>
+            <th>Prev Stock</th>
+            <th>New Stock</th>
+            <th>Reason</th>
+            <th>Ref</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% history.forEach(entry => { %>
+            <tr>
+              <td><%= new Date(entry.createdAt).toLocaleString() %></td>
+              <td><%= entry.product ? entry.product.title : '—' %></td>
+              <td><%= entry.changeType %></td>
+              <td><%= entry.quantity %></td>
+              <td><%= entry.previousStock %></td>
+              <td><%= entry.newStock %></td>
+              <td><%= entry.reason || '—' %></td>
+              <td><%= entry.referenceType ? (entry.referenceType + ' #' + entry.referenceId) : '—' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p>No inventory history available.</p>
+    <% } %>
+  </main>
+<%- include('../includes/end.ejs') %>

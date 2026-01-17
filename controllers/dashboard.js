@@ -34,13 +34,21 @@ exports.getCustomerDashboard = async (req, res) => {
       cartCount = cartItems.length;
     }
 
+    // Fetch categories for the mini category bar
+    const categories = await Category.findAll({ order: [['name', 'ASC']] });
+
+    // Fetch products to show on dashboard (show active products, limit 12)
+    const products = await Product.findAll({ where: { isActive: true }, order: [['createdAt', 'DESC']], limit: 12 });
+
     res.render('customer/dashboard', {
       pageTitle: 'My Dashboard',
       path: '/customer/dashboard',
       orderCount,
       cartCount,
       totalSpent,
-      recentOrders: orders
+      recentOrders: orders,
+      categories, // added
+      products // NEW: products to display on dashboard
     });
   } catch (error) {
     console.error('Customer dashboard error:', error);
@@ -282,3 +290,46 @@ exports.getFinanceDashboard = async (req, res) => {
   }
 };
 
+/**
+ * Delivery Dashboard Controller
+ */
+exports.getDeliveryDashboard = async (req, res) => {
+  try {
+    const Shipment = require('../models/shipment');
+    const Order = require('../models/order');
+
+    // Show shipments that are out for delivery or in transit or packed
+    const statuses = ['OutForDelivery', 'InTransit', 'Packed', 'Shipped'];
+
+    // Fetch shipments first (no include to avoid join mismatches)
+    const shipments = await Shipment.findAll({
+      where: { status: statuses },
+      order: [['createdAt', 'DESC']],
+      limit: 100
+    });
+
+    // Collect orderIds and fetch related orders separately
+    const orderIds = shipments.map(s => s.orderId).filter(id => id != null);
+    let ordersMap = {};
+    if (orderIds.length) {
+      const orders = await Order.findAll({ where: { id: orderIds }, attributes: ['id','orderNumber','totalAmount'] });
+      ordersMap = orders.reduce((map, o) => { map[o.id] = o; return map; }, {});
+    }
+
+    // Convert shipments to plain objects and attach order if available
+    const shipmentsWithOrder = shipments.map(s => {
+      const plain = s.get ? s.get({ plain: true }) : s;
+      plain.order = plain.orderId ? (ordersMap[plain.orderId] || null) : null;
+      return plain;
+    });
+
+    res.render('delivery/dashboard', {
+      pageTitle: 'Delivery Dashboard',
+      path: '/delivery/dashboard',
+      shipments: shipmentsWithOrder
+    });
+  } catch (error) {
+    console.error('Delivery dashboard error:', error);
+    res.status(500).render('500', { error: 'Failed to load delivery dashboard' });
+  }
+};

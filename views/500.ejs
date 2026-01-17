@@ -1,0 +1,15 @@
+<%- include('./includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <%- include('./includes/navigation.ejs') %>
+  <main style="max-width:800px;margin:40px auto;padding:20px;text-align:center;">
+    <h1>Something went wrong</h1>
+    <p style="color:#666;">An internal server error occurred. Please try again later.</p>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <pre style="text-align:left;margin-top:20px;background:#f8f8f8;padding:12px;border-radius:6px;overflow:auto;max-height:200px;color:#a33;"><%= error %></pre>
+    <% } %>
+    <p style="margin-top:20px;"><a href="/">Return to Home</a></p>
+  </main>
+<%- include('./includes/end.ejs') %>
+

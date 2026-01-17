@@ -1,0 +1,11 @@
+<% /* Categories mini-bar: expects locals.categories to be an array of {id,name} */ %>
+<% if (locals.categories && locals.categories.length > 0) { %>
+<nav style="margin:18px 0;">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <% locals.categories.forEach(cat => { %>
+      <a href="/categories/<%= cat.id %>" class="category-chip" style="display:inline-block;padding:8px 12px;background:#fff;border:1px solid #eee;border-radius:999px;text-decoration:none;color:#333;font-weight:600"> <%= cat.name %> </a>
+    <% }) %>
+  </div>
+</nav>
+<% } %>
+

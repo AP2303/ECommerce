@@ -24,5 +24,10 @@ router.post("/webhook", paymentController.postPayPalWebhook);
 // GET /payment/order/:orderId - Get payment by order ID (Authenticated users)
 router.get("/order/:orderId", paymentController.getPaymentByOrder);
 
-module.exports = router;
+// GET /payment/transactions - Transaction list page
+router.get("/transactions", paymentController.getTransactionsPage);
 
+// GET /payment/reports - Reports page
+router.get("/reports", paymentController.getReportsPage);
+
+module.exports = router;

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40" viewBox="0 0 160 40">
+  <rect width="160" height="40" rx="6" fill="#ffffff"/>
+  <g transform="translate(8,6)">
+    <rect width="28" height="28" rx="4" fill="#667eea" />
+    <text x="44" y="20" font-family="Segoe UI, Roboto, Arial" font-size="16" fill="#222" font-weight="700">Book Lab Store</text>
+  </g>
+</svg>
+

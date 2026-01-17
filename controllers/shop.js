@@ -175,3 +175,25 @@ exports.postOrder = (req, res, next) => {
     })
     .catch(err => { console.log(err); renderLogin(req, res); });
 };
+
+exports.getProductApi = (req, res, next) => {
+  const productId = req.params.productId;
+  Product.findByPk(productId)
+    .then(product => {
+      if (!product) return res.status(404).json({ error: 'not_found' });
+      // compute imageSrc similar to views
+      let imageSrc = '/images/placeholder.svg';
+      if (product.imageUrl) {
+        const v = String(product.imageUrl).trim();
+        if (v.indexOf('http') === 0) {
+          imageSrc = '/images/proxy?src=' + encodeURIComponent(v);
+        } else if (v.indexOf('/') === 0) {
+          imageSrc = v;
+        } else {
+          imageSrc = '/images/' + v;
+        }
+      }
+      return res.json({ id: product.id, title: product.title, price: product.price, description: product.description, stock: product.stock, imageUrl: product.imageUrl, imageSrc });
+    })
+    .catch(err => res.status(500).json({ error: 'server_error', message: String(err) }));
+};

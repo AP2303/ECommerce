@@ -3,6 +3,11 @@ const crypto = require('crypto');
 const User = require('../models/user');
 const Role = require('../models/role');
 
+// Helper - detect bcrypt hash
+function looksLikeBcryptHash(pw) {
+  return typeof pw === 'string' && pw.startsWith('$2') && pw.length >= 60;
+}
+
 /**
  * POST /auth/register
  * Register a new user
@@ -125,16 +130,34 @@ exports.postLogin = async (req, res, next) => {
       }
     }
 
-    // Check email verification (optional - can be disabled for development)
-    // if (!user.emailVerified) {
-    //   return res.status(403).json({
-    //     error: 'Please verify your email before logging in',
-    //     emailVerified: false
-    //   });
-    // }
+    // Verify password with compatibility for legacy plaintext passwords
+    let isMatch = false;
 
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
+    if (!user.password) {
+      // No password set
+      isMatch = false;
+    } else if (looksLikeBcryptHash(user.password)) {
+      // Normal bcrypt compare
+      isMatch = await bcrypt.compare(password, user.password);
+    } else {
+      // Legacy or non-bcrypt password stored — try direct comparison
+      try {
+        if (password === user.password) {
+          // Upgrade: hash the plaintext password and save
+          const newHash = await bcrypt.hash(String(password), 12);
+          user.password = newHash;
+          await user.save();
+          console.log(`Upgraded stored plaintext password to bcrypt for user ${user.email}`);
+          isMatch = true;
+        } else {
+          // As a fallback attempt, try bcrypt.compare in case it's a different hash format
+          isMatch = await bcrypt.compare(password, user.password).catch(() => false);
+        }
+      } catch (e) {
+        console.error('Password verification error for user', user.email, e.message || e);
+        isMatch = false;
+      }
+    }
 
     if (!isMatch) {
       // Increment login attempts
@@ -175,27 +198,28 @@ exports.postLogin = async (req, res, next) => {
     req.session.userName = user.name;
     req.session.userRole = user.role ? user.role.name : 'Customer';
 
-    // Determine redirect URL based on role
+    // Determine redirect URL based on role (case-insensitive, tolerant)
     let redirectUrl = '/customer/dashboard';
-    if (user.role) {
-      switch (user.role.name) {
-        case 'Administrator':
-          redirectUrl = '/admin/dashboard';
-          break;
-        case 'Warehouse':
-          redirectUrl = '/warehouse/dashboard';
-          break;
-        case 'Finance':
-          redirectUrl = '/payment/dashboard';
-          break;
-        case 'Delivery':
-          redirectUrl = '/warehouse/dashboard';
-          break;
-        case 'Customer':
-        default:
-          redirectUrl = '/customer/dashboard';
+    if (user.role && user.role.name) {
+      const r = String(user.role.name).toLowerCase();
+      console.log('User role normalized for redirect:', r);
+      if (r.indexOf('admin') !== -1 || r.indexOf('administrator') !== -1) {
+        redirectUrl = '/admin/dashboard';
+      } else if (r.indexOf('warehouse') !== -1) {
+        redirectUrl = '/warehouse/dashboard';
+      } else if (r.indexOf('finance') !== -1 || r.indexOf('account') !== -1) {
+        redirectUrl = '/payment/dashboard';
+      } else if (r.indexOf('delivery') !== -1 || r.indexOf('courier') !== -1) {
+        redirectUrl = '/delivery/dashboard';
+      } else if (r.indexOf('customer') !== -1) {
+        redirectUrl = '/customer/dashboard';
+      } else {
+        // fallback to customer dashboard
+        redirectUrl = '/customer/dashboard';
       }
     }
+
+    console.log('Login redirect chosen for user', user.email, '->', redirectUrl);
 
     res.status(200).json({
       message: 'Login successful',
@@ -357,4 +381,3 @@ exports.getCurrentUser = async (req, res, next) => {
     res.status(500).json({ error: 'Failed to get user info' });
   }
 };
-

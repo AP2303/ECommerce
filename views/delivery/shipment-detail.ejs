@@ -1,0 +1,48 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main style="max-width:900px;margin:20px auto;padding:20px;">
+    <h1>Shipment Detail</h1>
+    <p style="color:#666;">Tracking: <strong><%= shipment.trackingNumber || shipment.id %></strong></p>
+
+    <section style="background:#fff;padding:12px;border-radius:8px;margin-bottom:12px;">
+      <h3>Customer</h3>
+      <% if (shipment.order && shipment.order.user) { %>
+        <p><strong><%= shipment.order.user.name %></strong> &nbsp; &lt;<%= shipment.order.user.email %>&gt;</p>
+      <% } else { %>
+        <p>No customer info available</p>
+      <% } %>
+    </section>
+
+    <table style="width:100%;border-collapse:collapse;background:#fff;margin-top:12px;">
+      <tr><th style="text-align:left;padding:10px;width:200px;">Order</th><td style="padding:10px;"><a href="/admin/orders/<%= shipment.order?.id %>"><%= shipment.order?.orderNumber || shipment.orderId || '—' %></a></td></tr>
+      <tr><th style="text-align:left;padding:10px;">Status</th><td style="padding:10px;"><%= shipment.status %></td></tr>
+      <tr><th style="text-align:left;padding:10px;">Carrier</th><td style="padding:10px;"><%= shipment.carrier || '—' %></td></tr>
+      <tr><th style="text-align:left;padding:10px;">Estimated Delivery</th><td style="padding:10px;"><%= shipment.estimatedDeliveryDate ? new Date(shipment.estimatedDeliveryDate).toLocaleString() : '—' %></td></tr>
+      <tr><th style="text-align:left;padding:10px;">Shipping Address</th><td style="padding:10px;"><pre style="white-space:pre-wrap;margin:0;"><%= JSON.stringify(shipment.shippingAddress || {}, null, 2) %></pre></td></tr>
+      <tr><th style="text-align:left;padding:10px;">Notes</th><td style="padding:10px;"><%= shipment.notes || '—' %></td></tr>
+    </table>
+
+    <% if (shipment.order && shipment.order.orderItems && shipment.order.orderItems.length) { %>
+      <section style="margin-top:12px;background:#fff;padding:12px;border-radius:8px;">
+        <h3>Order Items</h3>
+        <ul style="margin:0;padding:0;list-style:none;">
+          <% shipment.order.orderItems.forEach(item => { %>
+            <li style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
+              <strong><%= item.product ? item.product.title : 'Product #' + item.productId %></strong>
+              <div style="color:#666;font-size:14px;">Qty: <%= item.quantity %> &nbsp; Price: $<%= (item.product ? item.product.price : 0).toFixed(2) %></div>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <form method="post" action="/delivery/shipments/<%= shipment.id %>/deliver" style="margin-top:16px;" data-deliver-form>
+      <button type="submit" class="deliver-btn" style="padding:10px 16px;background:#27ae60;color:#fff;border:none;border-radius:6px;">Mark as Delivered</button>
+      <a href="/delivery/dashboard" style="margin-left:8px;">Back</a>
+    </form>
+  </main>
+  <script src="/js/delivery.js"></script>
+<%- include('../includes/end.ejs') %>

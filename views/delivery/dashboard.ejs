@@ -1,0 +1,41 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main style="max-width:1100px;margin:20px auto;padding:20px;">
+    <h1>Delivery Dashboard</h1>
+    <p style="color:#666;">Track shipments and assignments</p>
+
+    <% if (shipments && shipments.length) { %>
+      <table style="width:100%;border-collapse:collapse;margin-top:12px;background:#fff;">
+        <thead>
+          <tr style="background:#f8f9fa;text-align:left;">
+            <th style="padding:10px;">Shipment #</th>
+            <th style="padding:10px;">Order</th>
+            <th style="padding:10px;">Status</th>
+            <th style="padding:10px;">Carrier</th>
+            <th style="padding:10px;">ETA</th>
+            <th style="padding:10px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% shipments.forEach(s => { %>
+            <tr style="border-bottom:1px solid #eee;">
+              <td style="padding:10px;"><%= s.trackingNumber || s.id %></td>
+              <td style="padding:10px;"><a href="/admin/orders/<%= s.order?.id %>"><%= s.order?.orderNumber || s.orderId || '—'%></a></td>
+              <td style="padding:10px;"><%= s.status %></td>
+              <td style="padding:10px;"><%= s.carrier || '—' %></td>
+              <td style="padding:10px;"><%= s.estimatedDeliveryDate ? new Date(s.estimatedDeliveryDate).toLocaleDateString() : '—' %></td>
+              <td style="padding:10px;">
+                <a href="/delivery/shipments/<%= s.id %>" style="padding:8px 12px;border-radius:6px;background:#667eea;color:white;text-decoration:none;">View</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p>No shipments to show.</p>
+    <% } %>
+  </main>
+<%- include('../includes/end.ejs') %>
