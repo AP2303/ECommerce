@@ -1,5 +1,6 @@
 const Product = require("../models/product");
 const Cart = require("../models/cart");
+const CartItem = require('../models/cart-item');
 
 const ERROR_PREFIX = "In shop controller, ";
 
@@ -73,15 +74,30 @@ exports.getCart = (req, res, next) => {
 };
 
 exports.postCart = (req, res, next) => {
+  // If AJAX request and not authenticated, return 401 JSON
+  const isAjax = req.xhr || req.headers['x-requested-with'] === 'XMLHttpRequest' || (req.headers.accept && req.headers.accept.indexOf('application/json') !== -1);
+  const productId = parseInt(req.body.productId, 10);
+  console.log('POST /cart called, isAjax=', isAjax, 'productId=', productId, 'userId=', req.user ? req.user.id : 'null');
   if (!req.user || typeof req.user.getCart !== 'function') {
+    console.log('postCart: user not authenticated or no getCart');
+    if (isAjax) {
+      return res.status(401).json({ error: 'not_authenticated' });
+    }
     return renderLogin(req, res);
   }
-  const productId = req.body.productId;
+
   let fetchedCart;
   let newQuantity = 1;
 
   req.user.getCart()
     .then(cart => {
+      if (!cart) {
+        console.log('postCart: No cart found for user, creating one');
+        return req.user.createCart().then(newCart => {
+          fetchedCart = newCart;
+          return newCart.getProducts({ where: { id: productId } });
+        });
+      }
       fetchedCart = cart;
       return cart.getProducts({ where: { id: productId } })
     })
@@ -97,14 +113,52 @@ exports.postCart = (req, res, next) => {
       return Product.findByPk(productId);
     })
     .then(product => {
-      return fetchedCart.addProduct(product, {
-        through: { quantity: newQuantity }
-      })
+      if (!product) throw new Error('Product not found: ' + productId);
+      console.log('postCart: about to add product to cart, fetchedCart id=', fetchedCart && fetchedCart.id, 'product id=', product.id, 'product title=', product.title);
+      console.log('postCart: fetchedCart methods: addProduct=', fetchedCart && typeof fetchedCart.addProduct);
+      try {
+        if (fetchedCart && typeof fetchedCart.addProduct === 'function') {
+          return fetchedCart.addProduct(product, {
+            through: { quantity: newQuantity }
+          });
+        } else {
+          console.warn('postCart: association helper addProduct not available, using CartItem fallback');
+          // upsert cart item
+          return CartItem.findOne({ where: { cartId: fetchedCart.id, productId: product.id } })
+            .then(existing => {
+              if (existing) {
+                existing.quantity = newQuantity;
+                return existing.save();
+              }
+              return CartItem.create({ cartId: fetchedCart.id, productId: product.id, quantity: newQuantity });
+            });
+        }
+      } catch (err) {
+        console.error('postCart: synchronous error during addProduct/fallback', err);
+        throw err;
+      }
     })
-    .then(() => {
-      res.redirect("/cart");
+    .then(async () => {
+      try {
+        if (isAjax) {
+          // compute cart count and return it
+          const productsInCart = await fetchedCart.getProducts();
+          console.log('postCart: AJAX success, cartCount=', productsInCart.length);
+          return res.json({ success: true, cartCount: productsInCart.length });
+        }
+        console.log('postCart: non-AJAX success, redirecting to /cart');
+        res.redirect("/cart");
+      } catch (err) {
+        console.error('postCart: error computing cart count', err);
+        if (isAjax) return res.json({ success: true });
+        res.redirect('/cart');
+      }
     })
-    .catch(error => { console.log(error); renderLogin(req, res); });
+    .catch(error => {
+      console.error('postCart: caught error', error);
+      if (isAjax) return res.status(500).json({ error: 'server_error', message: String(error) });
+      renderLogin(req, res);
+    });
 
 };
 

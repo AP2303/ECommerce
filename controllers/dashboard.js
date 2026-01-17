@@ -302,14 +302,48 @@ exports.getDeliveryDashboard = async (req, res) => {
     const statuses = ['OutForDelivery', 'InTransit', 'Packed', 'Shipped'];
 
     // Fetch shipments first (no include to avoid join mismatches)
-    const shipments = await Shipment.findAll({
-      where: { status: statuses },
-      order: [['createdAt', 'DESC']],
-      limit: 100
-    });
+    let shipments;
+    try {
+      shipments = await Shipment.findAll({
+        where: { status: statuses },
+        order: [['createdAt', 'DESC']],
+        limit: 100
+      });
+    } catch (err) {
+      console.error('Shipment.findAll failed, attempting raw SQL fallback:', err && err.message);
+      // fallback raw SQL - attempt common table name 'shipments'
+      try {
+        const sequelize = require('../util/database');
+        const placeholders = statuses.map(s => `'${s.replace("'","''")}'`).join(',');
+        const sql = `SELECT * FROM "shipments" WHERE status IN (${placeholders}) ORDER BY "created_at" DESC LIMIT 100`;
+        const [rows] = await sequelize.query(sql);
+        // Normalize rows to match model attribute names expected by the view
+        shipments = rows.map(r => {
+          return {
+            id: r.id,
+            trackingNumber: r.tracking_number || r.trackingNumber || null,
+            carrier: r.carrier,
+            status: r.status,
+            shippingMethod: r.shipping_method || r.shippingMethod || null,
+            shippingCost: r.shipping_cost || r.shippingCost || null,
+            estimatedDeliveryDate: r.estimated_delivery_date || r.estimatedDeliveryDate || null,
+            packedAt: r.packed_at || r.packedAt || null,
+            shippedAt: r.shipped_at || r.shippedAt || null,
+            deliveredAt: r.delivered_at || r.deliveredAt || null,
+            orderId: r.order_id || r.orderId || null,
+            shippingAddress: r.shipping_address || r.shippingAddress || null,
+            notes: r.notes || null,
+            createdAt: r.created_at || r.createdAt || null
+          };
+        });
+      } catch (rawErr) {
+        console.error('Raw SQL fallback for shipments also failed:', rawErr);
+        shipments = [];
+      }
+    }
 
-    // Collect orderIds and fetch related orders separately
-    const orderIds = shipments.map(s => s.orderId).filter(id => id != null);
+    // If shipments are Sequelize instances, proceed to map orderIds; if plain objects from fallback they already have orderId
+    const orderIds = (shipments || []).map(s => (s.get ? s.get('orderId') : s.orderId)).filter(id => id != null);
     let ordersMap = {};
     if (orderIds.length) {
       const orders = await Order.findAll({ where: { id: orderIds }, attributes: ['id','orderNumber','totalAmount'] });
@@ -317,11 +351,13 @@ exports.getDeliveryDashboard = async (req, res) => {
     }
 
     // Convert shipments to plain objects and attach order if available
-    const shipmentsWithOrder = shipments.map(s => {
-      const plain = s.get ? s.get({ plain: true }) : s;
+    const shipmentsWithOrder = (shipments || []).map(s => {
+      const plain = (s.get ? s.get({ plain: true }) : s);
       plain.order = plain.orderId ? (ordersMap[plain.orderId] || null) : null;
       return plain;
     });
+
+    console.log('Delivery dashboard: shipmentsWithOrder count =', (shipmentsWithOrder || []).length);
 
     res.render('delivery/dashboard', {
       pageTitle: 'Delivery Dashboard',
@@ -330,6 +366,6 @@ exports.getDeliveryDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error('Delivery dashboard error:', error);
-    res.status(500).render('500', { error: 'Failed to load delivery dashboard' });
+    res.status(500).render('500', { pageTitle: 'Delivery Dashboard - Error', path: req.path, error: (error && error.stack) || String(error) });
   }
 };

@@ -30,4 +30,8 @@ router.get("/transactions", paymentController.getTransactionsPage);
 // GET /payment/reports - Reports page
 router.get("/reports", paymentController.getReportsPage);
 
+// NEW: reconciliation and refunds pages
+router.get('/reconciliation', paymentController.getReconciliationPage);
+router.get('/refunds', paymentController.getRefundsPage);
+
 module.exports = router;

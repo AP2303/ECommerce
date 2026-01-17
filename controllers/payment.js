@@ -67,12 +67,30 @@ exports.getTransactionsPage = async (req, res) => {
     // Try to fetch payments if model exists, otherwise render empty
     let transactions = [];
     if (Payment && typeof Payment.findAll === 'function') {
-      transactions = await Payment.findAll({ order: [['createdAt','DESC']], limit: 100 });
+      try {
+        transactions = await Payment.findAll({ order: [['createdAt','DESC']], limit: 100 });
+      } catch (dbErr) {
+        console.warn('getTransactionsPage: Payment.findAll failed, rendering empty list. Error:', dbErr && dbErr.message);
+        transactions = [];
+      }
     }
-    res.render('payment/transactions', { pageTitle: 'Transactions', path: '/payment/transactions', transactions });
+    try {
+      return res.render('payment/transactions', { pageTitle: 'Transactions', path: '/payment/transactions', transactions });
+    } catch (renderErr) {
+      console.error('getTransactionsPage render error:', renderErr);
+      // fallback simple HTML
+      const rows = (transactions || []).map(t => (`<li>${t.paymentId || t.id} - $${Number(t.amount||0).toFixed(2)} - ${t.status}</li>`)).join('') || '<li>No transactions</li>';
+      return res.send(`<h1>Transactions</h1><ul>${rows}</ul>`);
+    }
   } catch (err) {
     console.error('getTransactionsPage error:', err);
-    res.status(500).render('500', { error: 'Failed to load transactions' });
+    // As a last resort render the view with an empty list instead of 500
+    try {
+      return res.render('payment/transactions', { pageTitle: 'Transactions', path: '/payment/transactions', transactions: [] });
+    } catch (finalErr) {
+      console.error('Final fallback render failed:', finalErr);
+      return res.send('<h1>Transactions (unavailable)</h1>');
+    }
   }
 };
 
@@ -88,6 +106,39 @@ exports.getReportsPage = async (req, res) => {
   }
 };
 
+// New: reconciliation page (finance)
+exports.getReconciliationPage = async (req, res) => {
+  try {
+    // For now, show a placeholder and recent transactions
+    let transactions = [];
+    if (Payment && typeof Payment.findAll === 'function') {
+      transactions = await Payment.findAll({ order: [['createdAt','DESC']], limit: 200 });
+    }
+    res.render('payment/reconciliation', { pageTitle: 'Reconciliation', path: '/payment/reconciliation', transactions });
+  } catch (err) {
+    console.error('getReconciliationPage error:', err);
+    res.status(500).render('500', { error: 'Failed to load reconciliation' });
+  }
+};
+
+// New: refunds page (finance)
+exports.getRefundsPage = async (req, res) => {
+  try {
+    // List refunded payments as a simple filter
+    let refunds = [];
+    if (Payment && typeof Payment.findAll === 'function') {
+      refunds = await Payment.findAll({ where: { status: 'Refunded' }, order: [['createdAt','DESC']], limit: 200 });
+    }
+    res.render('payment/refunds', { pageTitle: 'Refunds', path: '/payment/refunds', refunds });
+  } catch (err) {
+    console.error('getRefundsPage error:', err);
+    res.status(500).render('500', { error: 'Failed to load refunds' });
+  }
+};
+
 // Map existing names to route handlers if needed
 exports.getPaymentSuccess = exports.paymentSuccess;
 exports.getPaymentCancel = exports.paymentCancel;
+// expose new handlers
+exports.getReconciliation = exports.getReconciliationPage;
+exports.getRefunds = exports.getRefundsPage;

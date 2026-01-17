@@ -31,7 +31,7 @@
     </nav>
   <% } else { %>
     <div class="main-header__left" style="display:flex; align-items:center; gap:12px; padding:12px 18px;">
-      <a href="/" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
+      <a href="<%= locals.isAuthenticated ? '/customer/dashboard' : '/' %>" style="display:flex; align-items:center; text-decoration:none; color:inherit;">
         <img src="/images/logo.svg" alt="Book Lab Store" style="height:36px; width:auto; display:block;">
         <span style="font-weight:700; margin-left:6px; font-size:18px; color:#222;">Book Lab Store</span>
       </a>
@@ -39,13 +39,12 @@
     <nav class="main-header__nav">
         <ul class="main-header__item-list">
             <li class="main-header__item">
-                <a class="<%= localPath === '/' ? 'active' : '' %>" href="/">Shop</a>
+                <a class="<%= localPath === '/' ? 'active' : '' %>" href="<%= locals.isAuthenticated ? '/customer/dashboard' : '/' %>">Shop</a>
             </li>
             <li class="main-header__item">
-                <a class="<%= localPath === '/shop/product-list' ? 'active' : '' %>" href="/product-list">Products</a>
-            </li>
-            <li class="main-header__item">
-                <a class="<%= localPath === '/shop/cart' ? 'active' : '' %>" href="/cart">Cart</a>
+                <a class="<%= localPath === '/shop/cart' ? 'active' : '' %>" href="/cart" style="position:relative;">
+                  Cart <span id="cart-count" style="background:#ff5a5f;color:white;border-radius:999px;padding:2px 8px;font-size:12px;margin-left:8px;"><%= typeof cartCount !== 'undefined' ? cartCount : (locals.cartCount || 0) %></span>
+                </a>
             </li>
             <li class="main-header__item">
                 <a class="<%= localPath === '/shop/orders' ? 'active' : '' %>" href="/orders">Orders</a>
@@ -119,10 +118,7 @@
     <% } else { %>
         <ul class="mobile-nav__item-list">
                 <li class="mobile-nav__item">
-                    <a class="<%= localPath === '/' ? 'active' : '' %>" href="/">Shop</a>
-                </li>
-                <li class="mobile-nav__item">
-                    <a class="<%= localPath === '/products' ? 'active' : '' %>" href="/product-list">Products</a>
+                    <a class="<%= localPath === '/' ? 'active' : '' %>" href="<%= locals.isAuthenticated ? '/customer/dashboard' : '/' %>">Shop</a>
                 </li>
                 <li class="mobile-nav__item">
                     <a class="<%= localPath === '/cart' ? 'active' : '' %>" href="/cart">Cart</a>
@@ -143,4 +139,5 @@
             </ul>
     <% } %>
 </nav>
+<div id="toast-container" style="position:fixed;right:20px;bottom:20px;z-index:2000;pointer-events:none;"></div>
 <!-- Logout functionality handled by /js/main.js -->

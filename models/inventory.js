@@ -39,7 +39,8 @@ const Inventory = sequelize.define('inventory', {
     allowNull: true,
     comment: 'ID of the related order/purchase'
   }
+}, {
+  underscored: true
 });
 
 module.exports = Inventory;
-

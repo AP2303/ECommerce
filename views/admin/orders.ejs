@@ -22,8 +22,8 @@
           <% orders.forEach(o => { %>
             <tr style="border-bottom:1px solid #eee;">
               <td style="padding:10px;"><a href="/admin/orders/<%= o.id %>"><%= o.orderNumber || o.id %></a></td>
-              <td style="padding:10px;"><%= new Date(o.createdAt).toLocaleString() %></td>
-              <td style="padding:10px;">$<%= (o.totalAmount || 0).toFixed(2) %></td>
+               <td style="padding:10px;"><%= new Date(o.createdAt || o.created_at || Date.now()).toLocaleString() %></td>
+              <td style="padding:10px;">$<%= Number(o.totalAmount || 0).toFixed(2) %></td>
               <td style="padding:10px;"> <%= o.status %> </td>
               <td style="padding:10px;"><a href="/admin/orders/<%= o.id %>">View</a></td>
             </tr>

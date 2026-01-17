@@ -3,19 +3,10 @@
 </head>
 <body>
   <%- include('../includes/navigation.ejs') %>
-  <main style="max-width:1100px;margin:20px auto;padding:20px;">
+  <main style="max-width:900px;margin:20px auto;padding:20px;">
     <h1>Payment Reports</h1>
-    <p style="color:#666;">Summary of payment activity</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px;">
-      <div style="background:#fff;padding:16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <h3>Total Revenue</h3>
-        <div style="font-size:20px;font-weight:700;">$<%= (totalRevenue || 0).toFixed(2) %></div>
-      </div>
-      <div style="background:#fff;padding:16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <h3>Transactions</h3>
-        <div style="font-size:20px;font-weight:700;"><%= transactionCount || 0 %></div>
-      </div>
-    </div>
+    <p>Total Revenue: $<%= totalRevenue %></p>
+    <p>Transactions: <%= transactionCount %></p>
   </main>
 <%- include('../includes/end.ejs') %>
 

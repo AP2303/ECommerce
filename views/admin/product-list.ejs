@@ -20,14 +20,17 @@
                                         let imageSrc = '/images/placeholder.svg';
                                         if (product.imageUrl) {
                                           const v = String(product.imageUrl).trim();
-                                          if (v.indexOf('http') === 0 || v.indexOf('/') === 0) {
+                                          if (v.indexOf('http') === 0) {
+                                            // Use server-side proxy for remote hosts so images load under our origin (CSP-safe)
+                                            imageSrc = '/images/proxy?src=' + encodeURIComponent(v);
+                                          } else if (v.indexOf('/') === 0) {
                                             imageSrc = v;
                                           } else {
                                             imageSrc = '/images/' + v;
                                           }
                                         }
                                     %>
-                                    <img src="<%= imageSrc %>" alt="<%= product.title %>" onerror="this.onerror=null;this.src='/images/placeholder.svg'">
+                                    <img src="<%= imageSrc %>" alt="<%= product.title %>" width="300" height="420" class="js-img-fallback" data-placeholder="/images/placeholder.svg">
                                 </div>
                                 <div class="card__content">
                                     <h2 class="product__price">$
@@ -39,7 +42,7 @@
                                 </div>
                                 <div class="card__actions">
                                     <a href="/admin/edit-product/<%= product.id %>" class="btn">Edit</a>
-                                    <form action="/admin/delete-product" method="POST">
+                                    <form action="/admin/delete-product" method="POST" class="js-admin-delete" data-admin-delete="1">
                                         <input type="hidden" name="productId" value="<%= product.id %>">
                                         <button class="btn" type="submit">Delete</button>
                                     </form>

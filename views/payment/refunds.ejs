@@ -1,0 +1,19 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main style="max-width:1100px;margin:20px auto;padding:20px;">
+    <h1>Refunds</h1>
+    <% if (refunds && refunds.length) { %>
+      <ul>
+        <% refunds.forEach(r => { %>
+          <li><strong><%= r.paymentId || r.id %></strong> — $<%= r.amount %> — Refunded at: <%= r.processedAt ? new Date(r.processedAt).toLocaleString() : '—' %></li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p>No refunds found.</p>
+    <% } %>
+  </main>
+<%- include('../includes/end.ejs') %>
+

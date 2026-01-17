@@ -12,12 +12,14 @@ const Payment = sequelize.define('payment', {
     type: Sequelize.STRING,
     allowNull: false,
     unique: true,
-    comment: 'External payment provider ID (e.g., PayPal payment ID)'
+    comment: 'External payment provider ID (e.g., PayPal payment ID)',
+    field: 'payment_id'
   },
   transactionId: {
     type: Sequelize.STRING,
     allowNull: true,
-    comment: 'Transaction ID after successful payment'
+    comment: 'Transaction ID after successful payment',
+    field: 'transaction_id'
   },
   amount: {
     type: Sequelize.DECIMAL(10, 2),
@@ -34,26 +36,31 @@ const Payment = sequelize.define('payment', {
   paymentMethod: {
     type: Sequelize.STRING,
     allowNull: false,
-    comment: 'PayPal, CreditCard, etc.'
+    comment: 'PayPal, CreditCard, etc.',
+    field: 'payment_method'
   },
   processedAt: {
     type: Sequelize.DATE,
-    allowNull: true
+    allowNull: true,
+    field: 'processed_at'
   },
   payerEmail: {
     type: Sequelize.STRING,
-    allowNull: true
+    allowNull: true,
+    field: 'payer_email'
   },
   payerName: {
     type: Sequelize.STRING,
-    allowNull: true
+    allowNull: true,
+    field: 'payer_name'
   },
   metadata: {
     type: Sequelize.JSON,
     allowNull: true,
     comment: 'Additional payment data from provider'
   }
+}, {
+  underscored: true
 });
 
 module.exports = Payment;
-

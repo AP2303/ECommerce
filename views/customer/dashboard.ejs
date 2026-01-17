@@ -155,20 +155,30 @@
             padding: 15px;
             display: flex;
             justify-content: space-between;
+            align-items: stretch; /* allow children to stretch vertically */
+            gap: 10px;
+        }
+        /* make the form element take available space and remove default margins */
+        .card__actions > form { display: flex; flex: 1; margin: 0; }
+        /* make direct buttons and form buttons expand equally */
+        .card__actions > button,
+        .card__actions > form > button {
+            flex: 1;
+            min-width: 0;
+            width: 100%;
+            display: flex;
             align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            margin: 0;
+            white-space: nowrap; /* prevent wrapping */
+            overflow: hidden;    /* enable ellipsis */
+            text-overflow: ellipsis;
         }
-        .btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 15px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        .btn:hover {
-            background: #5568d3;
-        }
+        /* ensure consistent height for buttons */
+        .card__actions > button, .card__actions > form > button { height:44px; }
+        .btn { box-sizing: border-box; }
         /* Quick view modal styles */
         #quickview-modal {
             display: none;
@@ -237,12 +247,9 @@
                 <a href="/product-list" class="action-btn">Browse Products</a>
                 <a href="/cart" class="action-btn">View Cart</a>
                 <a href="/orders" class="action-btn">My Orders</a>
-                <a href="/categories" class="action-btn">All Categories</a>
+                <!-- All Categories button removed per request -->
             </div>
         </div>
-
-        <!-- Categories (minimal) -->
-        <%- include('../includes/categories.ejs') %>
 
         <!-- Products grid on dashboard -->
         <section style="margin-top:30px">
@@ -261,10 +268,10 @@
                                 <p style="color:#666;">Stock: <%= product.stock %></p>
                             </div>
                             <div class="card__actions">
-                                <button class="btn js-quickview" data-productid="<%= product.id %>">Quick View</button>
-                                <form action="/cart" method="POST" style="display:inline">
-                                    <input type="hidden" name="productId" value="<%= product.id %>">
-                                    <button class="btn">Add to Cart</button>
+                                <button type="button" class="btn js-quickview" data-productid="<%= product.id %>">View</button>
+                                <form action="/cart" method="POST">
+                                     <input type="hidden" name="productId" value="<%= product.id %>">
+                                     <button class="btn">Add to Cart</button>
                                 </form>
                             </div>
                         </article>

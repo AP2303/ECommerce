@@ -1,6 +1,7 @@
 const Product = require('../models/product');
 const Inventory = require('../models/inventory');
 const Order = require('../models/order');
+const User = require('../models/user');
 
 exports.getInventory = async (req, res) => {
   try {
@@ -12,7 +13,7 @@ exports.getInventory = async (req, res) => {
     });
   } catch (err) {
     console.error('getInventory error:', err);
-    res.status(500).render('500', { error: 'Failed to load inventory' });
+    res.status(500).render('500', { pageTitle: 'Inventory - Error', path: req.path, error: 'Failed to load inventory' });
   }
 };
 
@@ -24,15 +25,33 @@ exports.postUpdateStock = async (req, res) => {
 
     // Apply update
     const q = parseInt(quantity, 10) || 0;
+    const prev = product.stock || 0;
+    let newStock = prev;
+    let inventoryChangeType = 'Adjustment';
     if (changeType === 'add') {
-      product.stock = product.stock + q;
+      newStock = prev + q;
+      product.stock = newStock;
+      inventoryChangeType = 'StockIn';
     } else if (changeType === 'remove') {
-      product.stock = Math.max(0, product.stock - q);
+      newStock = Math.max(0, prev - q);
+      product.stock = newStock;
+      inventoryChangeType = 'StockOut';
     }
     await product.save();
 
-    // Log inventory change
-    await Inventory.create({ productId: product.id, change: q, reason: reason || 'Manual update', userId: req.user ? req.user.id : null });
+    // Log inventory change using defined Inventory fields
+    await Inventory.create({
+      productId: product.id,
+      changeType: inventoryChangeType,
+      quantity: q,
+      previousStock: prev,
+      newStock: newStock,
+      reason: reason || 'Manual update',
+      referenceType: 'Manual',
+      referenceId: null
+    });
+
+    console.log('postUpdateStock: updated product', product.id, 'prev=', prev, 'new=', newStock, 'changeType=', inventoryChangeType);
 
     res.status(200).json({ message: 'Stock updated', stock: product.stock });
   } catch (err) {
@@ -49,13 +68,13 @@ exports.getOrdersToPack = async (req, res) => {
       order: [['createdAt', 'DESC']],
       limit: 50,
       attributes: ['id', 'orderNumber', 'status', 'totalAmount', 'createdAt', 'userId'],
-      include: [{ model: require('../models/user'), attributes: ['id','name','email'] }]
+      include: [{ model: User, as: 'user', attributes: ['id','name','email'] }]
     });
 
     res.render('warehouse/orders-to-pack', { pageTitle: 'Orders to Pack', path: '/warehouse/orders-to-pack', orders });
   } catch (err) {
     console.error('getOrdersToPack error:', err);
-    res.status(500).render('500', { error: 'Failed to load orders to pack' });
+    res.status(500).render('500', { pageTitle: 'Orders to Pack - Error', path: req.path, error: (err && err.stack) || String(err) });
   }
 };
 
@@ -76,8 +95,49 @@ exports.getInventoryHistory = async (req, res) => {
     const history = await Inventory.findAll({ include: [{ model: Product, as: 'product' }], limit: 100, order: [['createdAt', 'DESC']] });
     res.render('warehouse/inventory-history', { pageTitle: 'Inventory History', path: '/warehouse/inventory-history', history });
   } catch (err) {
-    console.error('getInventoryHistory error:', err);
-    res.status(500).render('500', { error: 'Failed to load inventory history' });
+    console.error('getInventoryHistory error (findAll):', err);
+    // Fallback: try raw query against common table names to be tolerant of schema mismatches
+    try {
+      const sequelize = require('../util/database');
+      const tryTables = ['inventories', 'inventory'];
+      let rows = [];
+      for (const t of tryTables) {
+        try {
+          const sql = `SELECT * FROM "${t}" ORDER BY "createdAt" DESC LIMIT 100`;
+          console.log('getInventoryHistory: attempting raw query on table', t);
+          const [result] = await sequelize.query(sql);
+          if (result && result.length) { rows = result; break; }
+        } catch (qe) {
+          // continue trying other table names
+          console.warn('getInventoryHistory raw query failed for table', t, qe.message);
+        }
+      }
+
+      // If we have rows, attempt to attach product titles (best-effort)
+      if (rows && rows.length) {
+        const out = [];
+        for (const r of rows) {
+          const entry = Object.assign({}, r);
+          try {
+            if (r.productId) {
+              const prod = await Product.findByPk(r.productId);
+              entry.product = prod ? { title: prod.title } : null;
+            }
+          } catch (inner) {
+            console.warn('getInventoryHistory: failed to load product for row', r.productId, inner && inner.message);
+          }
+          out.push(entry);
+        }
+        return res.render('warehouse/inventory-history', { pageTitle: 'Inventory History', path: '/warehouse/inventory-history', history: out });
+      }
+
+      // No rows found via fallback - render empty history with a helpful note
+      return res.render('warehouse/inventory-history', { pageTitle: 'Inventory History', path: '/warehouse/inventory-history', history: [] });
+    } catch (fallbackErr) {
+      console.error('getInventoryHistory fallback error:', fallbackErr);
+      // As a last resort, render the view with empty history instead of throwing 500
+      return res.render('warehouse/inventory-history', { pageTitle: 'Inventory History', path: '/warehouse/inventory-history', history: [] });
+    }
   }
 };
 

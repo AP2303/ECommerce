@@ -161,13 +161,30 @@ app.post('/logoutnow', authController.postLogout);
 const adminRoutes = require("./routes/admin");
 const shopRoutes = require("./routes/shop");
 const authRoutes = require("./routes/auth");
-const categoryRoutes = require("./routes/category");
 const paymentRoutes = require("./routes/payment");
 const warehouseRoutes = require("./routes/warehouse");
 
 const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {flags: 'a'})
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      // Allow HTTPS styles (e.g., Google Fonts) and inline styles used in templates
+      styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+      // Allow fonts from HTTPS hosts (Google Fonts uses fonts.gstatic.com)
+      fontSrc: ["'self'", 'https:', 'data:'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      frameSrc: ["'self'", 'https://www.paypal.com'],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"]
+    }
+  }
+}));
 app.use(compression());
 app.use(morgan('combined', {stream: accessLogStream}));
 
@@ -197,6 +214,21 @@ app.use(async (req, res, next) => {
     res.locals.isAuthenticated = !!req.user;
     res.locals.currentUser = req.user;
     res.locals.currentRole = req.user && req.user.role ? req.user.role.name : null;
+
+    // Compute cartCount for header if user exists
+    res.locals.cartCount = 0;
+    if (req.user) {
+      try {
+        const userCart = await req.user.getCart();
+        if (userCart) {
+          const cartProducts = await userCart.getProducts();
+          res.locals.cartCount = cartProducts.length;
+        }
+      } catch (err) {
+        console.warn('Failed to compute cartCount for user:', err);
+        res.locals.cartCount = 0;
+      }
+    }
 
     next();
   } catch (err) {
@@ -228,6 +260,58 @@ if (process.env.NODE_ENV !== 'production') {
       user: req.user ? { id: req.user.id, email: req.user.email, role: req.user.role ? req.user.role.name : null } : null,
       localsRole: res.locals.currentRole || null
     });
+  });
+
+  // Development helper: inspect shipments model vs raw SQL to debug schema mismatches
+  app.get('/debug/shipments', async (req, res) => {
+    try {
+      const Shipment = require('./models/shipment');
+      const sequelize = require('./util/database');
+      const out = { modelQuery: null, modelError: null, rawQuery: null, rawError: null };
+      try {
+        const m = await Shipment.findAll({ limit: 10 });
+        out.modelQuery = m.map(s => (s.get ? s.get({ plain: true }) : s));
+      } catch (me) {
+        out.modelError = me && (me.stack || me.message || String(me));
+      }
+
+      try {
+        const [rows] = await sequelize.query('SELECT * FROM "shipments" LIMIT 10');
+        out.rawQuery = rows;
+      } catch (re) {
+        out.rawError = re && (re.stack || re.message || String(re));
+      }
+
+      res.json(out);
+    } catch (err) {
+      res.status(500).json({ error: 'debug_failed', message: String(err), stack: err.stack });
+    }
+  });
+
+  // Development helper: inspect payments model vs raw SQL
+  app.get('/debug/payments', async (req, res) => {
+    try {
+      const Payment = require('./models/payment');
+      const sequelize = require('./util/database');
+      const out = { modelQuery: null, modelError: null, rawQuery: null, rawError: null };
+      try {
+        const m = await Payment.findAll({ limit: 10 });
+        out.modelQuery = m.map(p => (p.get ? p.get({ plain: true }) : p));
+      } catch (me) {
+        out.modelError = me && (me.stack || me.message || String(me));
+      }
+
+      try {
+        const [rows] = await sequelize.query('SELECT * FROM "payments" LIMIT 10');
+        out.rawQuery = rows;
+      } catch (re) {
+        out.rawError = re && (re.stack || re.message || String(re));
+      }
+
+      res.json(out);
+    } catch (err) {
+      res.status(500).json({ error: 'debug_failed', message: String(err), stack: err.stack });
+    }
   });
 }
 
@@ -266,7 +350,6 @@ app.use('/warehouse', roleAuth.ensureRoles(['Warehouse', 'Administrator']), ware
 app.use('/payment', roleAuth.ensureRoles(['Finance', 'Administrator']), paymentRoutes);
 app.use('/delivery', roleAuth.ensureRoles(['Delivery', 'Administrator']), require('./routes/delivery'));
 app.use("/auth", authRoutes);
-app.use("/categories", categoryRoutes);
 app.use(shopRoutes);
 
 app.use(errorController.get404);
@@ -315,8 +398,8 @@ Payment.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 
 // Order-Shipment relationship (one-to-one)
 // Use explicit foreignKey object with name and field to match existing DB column 'orderId'
-Order.hasOne(Shipment, { foreignKey: { name: 'orderId', field: 'orderId' }, as: 'shipment' });
-Shipment.belongsTo(Order, { foreignKey: { name: 'orderId', field: 'orderId' }, as: 'order' });
+Order.hasOne(Shipment, { foreignKey: { name: 'orderId', field: 'order_id' }, as: 'shipment' });
+Shipment.belongsTo(Order, { foreignKey: { name: 'orderId', field: 'order_id' }, as: 'order' });
 
 // Product-Inventory relationship (inventory log)
 Inventory.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
@@ -407,7 +490,6 @@ async function startServer() {
       console.log(`  Customer: customer@bookstore.com / customer123`);
       console.log(`\nAvailable endpoints:`);
       console.log(`  /auth/* - Authentication`);
-      console.log(`  /categories/* - Categories`);
       console.log(`  /payment/* - Payment`);
       console.log(`  /warehouse/* - Warehouse`);
       console.log(`  /admin/* - Admin`);

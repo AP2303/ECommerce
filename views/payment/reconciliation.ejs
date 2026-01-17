@@ -1,0 +1,20 @@
+<%- include('../includes/head.ejs') %>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <%- include('../includes/navigation.ejs') %>
+  <main style="max-width:1100px;margin:20px auto;padding:20px;">
+    <h1>Reconciliation</h1>
+    <p>Quick reconciliation view of recent transactions.</p>
+    <% if (transactions && transactions.length) { %>
+      <ul>
+        <% transactions.forEach(t => { %>
+          <li><strong><%= t.paymentId || t.id %></strong> — $<%= t.amount %> — <%= t.status %></li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p>No transactions to reconcile.</p>
+    <% } %>
+  </main>
+<%- include('../includes/end.ejs') %>
+

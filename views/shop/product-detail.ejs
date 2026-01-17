@@ -7,8 +7,20 @@
     <main>
         <section class="product-detail">
             <div class="product-detail__image">
-                <img src="<%= product.imageUrl || '/images/placeholder.svg' %>" alt="<%= product.title %>"
-                    onerror="this.onerror=null;this.src='/images/placeholder.svg'" width="400" height="560">
+                <%
+                  let imgSrc = product.imageUrl || '/images/placeholder.svg';
+                  if (product.imageUrl) {
+                    const v = String(product.imageUrl).trim();
+                    if (v.indexOf('http') === 0) {
+                      imgSrc = '/images/proxy?src=' + encodeURIComponent(v);
+                    } else if (v.indexOf('/') === 0) {
+                      imgSrc = v;
+                    } else {
+                      imgSrc = '/images/' + v;
+                    }
+                  }
+                %>
+                <img src="<%= imgSrc %>" alt="<%= product.title %>" class="js-img-fallback" data-placeholder="/images/placeholder.svg" width="400" height="560">
             </div>
             <div class="product-detail__info">
                 <h1><%= product.title %></h1>
