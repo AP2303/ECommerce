@@ -192,44 +192,52 @@ exports.postLogin = async (req, res, next) => {
     user.lastLoginAt = new Date();
     await user.save();
 
-    // Create session
-    req.session.userId = user.id;
-    req.session.userEmail = user.email;
-    req.session.userName = user.name;
-    req.session.userRole = user.role ? user.role.name : 'Customer';
-
-    // Determine redirect URL based on role (case-insensitive, tolerant)
-    let redirectUrl = '/customer/dashboard';
-    if (user.role && user.role.name) {
-      const r = String(user.role.name).toLowerCase();
-      console.log('User role normalized for redirect:', r);
-      if (r.indexOf('admin') !== -1 || r.indexOf('administrator') !== -1) {
-        redirectUrl = '/admin/dashboard';
-      } else if (r.indexOf('warehouse') !== -1) {
-        redirectUrl = '/warehouse/dashboard';
-      } else if (r.indexOf('finance') !== -1 || r.indexOf('account') !== -1) {
-        redirectUrl = '/payment/dashboard';
-      } else if (r.indexOf('delivery') !== -1 || r.indexOf('courier') !== -1) {
-        redirectUrl = '/delivery/dashboard';
-      } else if (r.indexOf('customer') !== -1) {
-        redirectUrl = '/customer/dashboard';
-      } else {
-        // fallback to customer dashboard
-        redirectUrl = '/customer/dashboard';
+       // Regenerate session to prevent session fixation
+    req.session.regenerate(async (err) => {
+      if (err) {
+        console.error('Session regeneration error on login:', err);
+        return res.status(500).json({ error: 'Login failed' });
       }
-    }
 
-    console.log('Login redirect chosen for user', user.email, '->', redirectUrl);
+      // Create session values
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
+      req.session.userName = user.name;
+      req.session.userRole = user.role ? user.role.name : 'Customer';
 
-    res.status(200).json({
-      message: 'Login successful',
-      redirectUrl: redirectUrl,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role ? user.role.name : 'Customer'
+      // Determine redirect URL based on role (case-insensitive, tolerant)
+      let redirectUrl = '/customer/dashboard';
+      if (user.role && user.role.name) {
+        const r = String(user.role.name).toLowerCase();
+        console.log('User role normalized for redirect:', r);
+        if (r.indexOf('admin') !== -1 || r.indexOf('administrator') !== -1) {
+          redirectUrl = '/admin/dashboard';
+        } else if (r.indexOf('warehouse') !== -1) {
+          redirectUrl = '/warehouse/dashboard';
+        } else if (r.indexOf('finance') !== -1 || r.indexOf('account') !== -1) {
+          redirectUrl = '/payment/dashboard';
+        } else if (r.indexOf('delivery') !== -1 || r.indexOf('courier') !== -1) {
+          redirectUrl = '/delivery/dashboard';
+        } else if (r.indexOf('customer') !== -1) {
+          redirectUrl = '/customer/dashboard';
+        } else {
+          // fallback to customer dashboard
+          redirectUrl = '/customer/dashboard';
+        }
       }
+
+      console.log('Login redirect chosen for user', user.email, '->', redirectUrl);
+
+      return res.status(200).json({
+        message: 'Login successful',
+        redirectUrl: redirectUrl,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role ? user.role.name : 'Customer'
+        }
+      });
     });
 
   } catch (error) {
@@ -270,15 +278,11 @@ exports.postRequestUnlock = async (req, res, next) => {
 
     if (!user) {
       // Don't reveal if email exists
-      return res.status(200).json({
-        message: 'If the email exists, an unlock code has been sent.'
-      });
+      return res.status(200).json({ message: 'If the email exists, an unlock code has been sent.' });
     }
 
     if (!user.isLocked) {
-      return res.status(400).json({
-        error: 'Account is not locked'
-      });
+      return res.status(400).json({ error: 'Account is not locked' });
     }
 
     // Generate unlock code
@@ -289,13 +293,12 @@ exports.postRequestUnlock = async (req, res, next) => {
     // TODO: Send unlock code email
     // await sendUnlockEmail(user.email, unlockCode);
 
-    console.log(`Unlock code for ${email}: ${unlockCode}`); // For development
+    // For security do not return the code in the response in production
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Unlock code for ${email}: ${unlockCode}`);
+    }
 
-    res.status(200).json({
-      message: 'Unlock code sent to your email',
-      // Remove this in production:
-      devCode: unlockCode
-    });
+    res.status(200).json({ message: 'Unlock code sent to your email' });
 
   } catch (error) {
     console.error('Request unlock error:', error);
