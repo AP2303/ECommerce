@@ -6,6 +6,9 @@ const paymentController = require("../controllers/payment");
  * Payment Routes
  */
 
+// POST /payment/create-paypal-order - Create PayPal order (for JavaScript SDK v5)
+router.post("/create-paypal-order", paymentController.createPayPalOrder);
+
 // POST /payment/create - Create PayPal payment (Authenticated users)
 router.post("/create", paymentController.postCreatePayment);
 

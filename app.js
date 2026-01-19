@@ -168,6 +168,12 @@ const warehouseRoutes = require("./routes/warehouse");
 const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {flags: 'a'})
 
 
+// Set Permissions-Policy to allow payment features (silences PayPal warnings)
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'payment=*');
+  next();
+});
+
 // Use a permissive CSP during development to allow PayPal Sandbox, conversion pixels and image proxies to function.
 if (process.env.NODE_ENV === 'production') {
   app.use(helmet());

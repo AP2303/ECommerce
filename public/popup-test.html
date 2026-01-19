@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PayPal Popup Test - Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 { color: #0070ba; }
+        .test-btn {
+            background: #0070ba;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .test-btn:hover { background: #005a94; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .info { color: blue; }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .instruction {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔍 PayPal Popup Diagnostic Tool</h1>
+        <p>This page tests if your browser allows popups from this domain.</p>
+
+        <div class="instruction">
+            <strong>⚠️ Before Testing:</strong>
+            <ol>
+                <li>Look at your browser's address bar (top left)</li>
+                <li>Check for a popup blocker icon (usually 🚫 or a red X)</li>
+                <li>If present, click it and select "Always allow popups from localhost"</li>
+            </ol>
+        </div>
+
+        <h3>Test 1: Simple Popup Test</h3>
+        <button class="test-btn" onclick="testSimplePopup()">Test Simple Popup</button>
+        <p class="info">This should open a new window immediately.</p>
+
+        <h3>Test 2: Delayed Popup Test (Will Fail)</h3>
+        <button class="test-btn" onclick="testDelayedPopup()">Test Delayed Popup</button>
+        <p class="info">This will be blocked - simulates async delay.</p>
+
+        <h3>Test 3: PayPal Sandbox Direct</h3>
+        <button class="test-btn" onclick="testPayPalDirect()">Test PayPal Popup</button>
+        <p class="info">Opens PayPal sandbox directly.</p>
+
+        <div id="results"></div>
+    </div>
+
+    <div class="card">
+        <h2>Browser Settings Guide</h2>
+
+        <h3>Chrome</h3>
+        <ol>
+            <li>Click the <strong>lock icon</strong> or <strong>site settings icon</strong> in the address bar</li>
+            <li>Find <strong>"Popups and redirects"</strong></li>
+            <li>Select <strong>"Allow"</strong></li>
+            <li>Refresh this page</li>
+        </ol>
+
+        <h3>Firefox</h3>
+        <ol>
+            <li>Click the <strong>shield icon</strong> in the address bar</li>
+            <li>Turn off <strong>"Enhanced Tracking Protection"</strong> for this site</li>
+            <li>Or go to Settings → Privacy & Security → Permissions → Popups</li>
+            <li>Add exception for localhost</li>
+        </ol>
+
+        <h3>Edge</h3>
+        <ol>
+            <li>Click the <strong>lock icon</strong> in the address bar</li>
+            <li>Go to <strong>"Permissions for this site"</strong></li>
+            <li>Find <strong>"Pop-ups and redirects"</strong></li>
+            <li>Select <strong>"Allow"</strong></li>
+        </ol>
+
+        <h3>Alternative: Use Incognito/Private Mode</h3>
+        <p>Sometimes extensions block popups. Try:</p>
+        <ul>
+            <li>Chrome: Ctrl+Shift+N</li>
+            <li>Firefox: Ctrl+Shift+P</li>
+            <li>Edge: Ctrl+Shift+N</li>
+        </ul>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+            results.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+        }
+
+        function testSimplePopup() {
+            log('Testing simple popup...', 'info');
+            try {
+                const popup = window.open('about:blank', '_blank', 'width=600,height=400');
+                if (popup) {
+                    log('SUCCESS: Popup opened!', 'success');
+                    popup.document.write('<html><body style="font-family:Arial;padding:50px;text-align:center;"><h1 style="color:green;">✅ Popup Works!</h1><p>You can close this window.</p><button onclick="window.close()" style="padding:10px 20px;font-size:16px;cursor:pointer;">Close</button></body></html>');
+                    setTimeout(() => {
+                        try { popup.close(); } catch(e) {}
+                    }, 3000);
+                } else {
+                    log('BLOCKED: Popup was blocked by browser!', 'error');
+                    log('Action needed: Allow popups in browser settings (see guide below)', 'error');
+                }
+            } catch(err) {
+                log('ERROR: ' + err.message, 'error');
+            }
+        }
+
+        function testDelayedPopup() {
+            log('Testing delayed popup (this should fail)...', 'info');
+            setTimeout(() => {
+                try {
+                    const popup = window.open('about:blank', '_blank', 'width=600,height=400');
+                    if (popup) {
+                        log('Unexpected: Delayed popup opened (unusual)', 'success');
+                        popup.close();
+                    } else {
+                        log('Expected: Delayed popup blocked (this is normal)', 'info');
+                        log('This demonstrates why async delays break popups', 'info');
+                    }
+                } catch(err) {
+                    log('Expected: Delayed popup blocked - ' + err.message, 'info');
+                }
+            }, 100);
+        }
+
+        function testPayPalDirect() {
+            log('Testing PayPal sandbox popup...', 'info');
+            try {
+                const popup = window.open('https://www.sandbox.paypal.com/checkoutnow', '_blank', 'width=500,height=600');
+                if (popup) {
+                    log('SUCCESS: PayPal popup opened!', 'success');
+                    log('Your PayPal integration should work now!', 'success');
+                } else {
+                    log('BLOCKED: PayPal popup blocked!', 'error');
+                    log('You must allow popups from localhost to use PayPal', 'error');
+                }
+            } catch(err) {
+                log('ERROR: ' + err.message, 'error');
+            }
+        }
+
+        // Check popup blocker status on load
+        window.addEventListener('load', () => {
+            log('Page loaded - ready for testing', 'info');
+            log('Browser: ' + navigator.userAgent.split(' ').pop(), 'info');
+
+            // Try to detect if popups are blocked
+            const popup = window.open('', '', 'width=1,height=1');
+            if (popup) {
+                popup.close();
+                log('Initial test: Popups appear to be ALLOWED ✅', 'success');
+            } else {
+                log('Initial test: Popups appear to be BLOCKED ❌', 'error');
+                log('Please follow the browser settings guide below', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
+

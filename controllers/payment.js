@@ -446,6 +446,108 @@ exports.getRefundsPage = async (req, res) => {
   }
 };
 
+// Create PayPal order endpoint for JavaScript SDK v5
+// Returns only the order ID in the required format: { paypalOrder: { id: "..." } }
+exports.createPayPalOrder = async (req, res) => {
+  try {
+    console.log('POST /payment/create-paypal-order called; body=', JSON.stringify(req.body || {}));
+    const { orderId, amount, currency } = req.body;
+
+    let order = null;
+    let purchaseAmount = null;
+    let purchaseCurrency = 'GBP';
+
+    if (orderId) {
+      order = await Order.findByPk(orderId);
+      if (!order) {
+        console.warn('createPayPalOrder: orderId provided but order not found:', orderId);
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      purchaseAmount = Number(order.totalAmount).toFixed(2);
+      purchaseCurrency = order.currency || 'GBP';
+    } else {
+      // Fallback: allow amount and currency directly
+      if (!amount) {
+        return res.status(400).json({ error: 'orderId or amount required' });
+      }
+      purchaseAmount = Number(amount).toFixed(2);
+      purchaseCurrency = (currency || 'GBP').toUpperCase();
+    }
+
+    // Build purchase units
+    const purchaseUnits = [{
+      reference_id: order ? String(order.id) : null,
+      amount: {
+        currency_code: purchaseCurrency,
+        value: purchaseAmount
+      }
+    }];
+
+    console.log('createPayPalOrder: creating PayPal order for amount=', purchaseAmount, purchaseCurrency);
+
+    const client = paypalClient.getClient();
+    const request = new (require('@paypal/checkout-server-sdk').orders.OrdersCreateRequest)();
+    request.prefer('return=representation');
+    request.requestBody({
+      intent: 'CAPTURE',
+      purchase_units: purchaseUnits,
+      application_context: {
+        brand_name: 'Book Lab Store',
+        landing_page: 'BILLING',
+        user_action: 'PAY_NOW'
+      }
+    });
+
+    let createResp;
+    try {
+      createResp = await client.execute(request);
+    } catch (paypalErr) {
+      console.error('createPayPalOrder: PayPal API call failed', paypalErr && (paypalErr.statusCode || paypalErr.message || paypalErr));
+      const detail = (paypalErr && (paypalErr.message || paypalErr.statusCode)) || String(paypalErr);
+      return res.status(502).json({ error: 'Failed to create PayPal order', detail });
+    }
+
+    if (!createResp || !createResp.result || !createResp.result.id) {
+      console.error('createPayPalOrder: invalid response from PayPal', createResp);
+      return res.status(502).json({ error: 'Failed to create PayPal order', detail: 'no_order_id' });
+    }
+
+    // Create Payment record in DB (pending) - optional, can be done after capture
+    try {
+      const paymentPayload = {
+        paymentId: createResp.result.id,
+        transactionId: null,
+        amount: purchaseAmount,
+        currency: purchaseCurrency,
+        status: 'Pending',
+        paymentMethod: 'PayPal',
+        payerEmail: null,
+        payerName: null,
+        processedAt: null,
+        metadata: createResp.result
+      };
+      if (order && order.id) paymentPayload.orderId = order.id;
+
+      await Payment.create(paymentPayload).catch(err => {
+        console.warn('createPayPalOrder: failed to persist Payment record, continuing...', err && err.message);
+      });
+    } catch (dbErr) {
+      console.warn('createPayPalOrder: DB error (non-fatal)', dbErr && dbErr.message);
+    }
+
+    // Return ONLY the order ID in the format expected by PayPal SDK v5
+    console.log('createPayPalOrder: success, returning order ID:', createResp.result.id);
+    return res.status(200).json({
+      paypalOrder: {
+        id: createResp.result.id
+      }
+    });
+  } catch (err) {
+    console.error('createPayPalOrder error:', err && (err.stack || err.message || err));
+    return res.status(500).json({ error: 'Failed to create PayPal order', detail: err && (err.message || String(err)) });
+  }
+};
+
 // Map existing names to route handlers if needed
 exports.getPaymentSuccess = exports.paymentSuccess;
 exports.getPaymentCancel = exports.paymentCancel;

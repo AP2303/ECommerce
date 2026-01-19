@@ -31,16 +31,13 @@
                 <hr>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
                   <div style="font-weight:700;">Total: £<%= total.toFixed(2) %></div>
-                  <div style="display:flex;gap:10px;align-items:center;">
-
-                    <button id="cart-paypal-btn" class="btn">Pay with PayPal</button>
-                  </div>
                 </div>
+                <!-- PayPal Buttons Container (rendered immediately) -->
+                <div id="paypal-button-container" style="margin-top:16px;"></div>
             <% } else { %>
                 <h1>No Products in Cart!</h1>
             <% } %>
         </main>
         <%- include('../includes/end.ejs') %>
-        <div id="paypal-button-container" style="display:none;margin-top:16px"></div>
-        <script src="https://www.paypal.com/sdk/js?client-id=<%= PAYPAL_CLIENT_ID %>&currency=GBP&locale=en_GB&intent=capture&components=buttons"></script>
+        <script src="https://www.paypal.com/sdk/js?client-id=<%= PAYPAL_CLIENT_ID %>&currency=GBP&locale=en_GB&buyer-country=GB&intent=capture&components=buttons&disable-funding=credit,card"></script>
          <script src="/js/cart-paypal.js"></script>
