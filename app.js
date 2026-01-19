@@ -24,6 +24,7 @@ const morgan = require('morgan');
 const express = require("express");
 const bodyParser = require("body-parser");
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 
 const authController = require('./controllers/auth');
 const roleAuth = require('./middleware/roleAuth');
@@ -52,8 +53,8 @@ app.set("views", "views");
 // parse incoming JSON for fetch requests
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(cookieParser());
 
-const { URL } = require('url');
 // Simple image proxy for allowlisted hosts to bypass strict CSP (development helper)
 // Register this BEFORE static so it is matched reliably and to provide diagnostics.
 app.get('/images/proxy', async (req, res) => {
@@ -166,25 +167,49 @@ const warehouseRoutes = require("./routes/warehouse");
 
 const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {flags: 'a'})
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      scriptSrcAttr: ["'none'"],
-      // Allow HTTPS styles (e.g., Google Fonts) and inline styles used in templates
-      styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
-      // Allow fonts from HTTPS hosts (Google Fonts uses fonts.gstatic.com)
-      fontSrc: ["'self'", 'https:', 'data:'],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
-      frameSrc: ["'self'", 'https://www.paypal.com'],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"]
+
+// Use a permissive CSP during development to allow PayPal Sandbox, conversion pixels and image proxies to function.
+if (process.env.NODE_ENV === 'production') {
+  app.use(helmet());
+} else {
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // Allow PayPal scripts (live & sandbox) and inline execution needed by the SDK
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://www.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypal.com', 'https://www.sandbox.paypalobjects.com', 'https://*.paypal.com', 'https://*.paypalobjects.com'],
+        // Allow inline event handlers (development helper) - in production lock this down
+        scriptSrcAttr: ["'unsafe-inline'"],
+        // Allow HTTPS styles (e.g., Google Fonts) and inline styles used in templates
+        styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+        // Allow fonts and data URIs
+        fontSrc: ["'self'", 'https:', 'data:'],
+        // Allow images from any HTTPS origin and data URIs; image proxy will enforce a host allowlist
+        imgSrc: ["'self'", 'data:', 'https:'],
+        // Allow connections to PayPal APIs, sandbox logger endpoints and Google ad/conversion hosts
+        connectSrc: [
+          "'self'",
+          'https://api-m.sandbox.paypal.com',
+          'https://api-m.paypal.com',
+          'https://www.sandbox.paypal.com',
+          'https://www.paypal.com',
+          'https://*.paypal.com',
+          'https://c.paypal.com',
+          'https://www.google.com',
+          'https://www.google-analytics.com',
+          'https://www.googleadservices.com',
+          'https://pagead2.googlesyndication.com',
+          'https://www.googletagmanager.com'
+        ],
+        // Allow frames from PayPal (sandbox & live)
+        frameSrc: ["'self'", 'https://www.paypal.com', 'https://www.sandbox.paypal.com', 'https://*.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypalobjects.com'],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'", 'https://www.sandbox.paypal.com', 'https://www.paypal.com']
+      }
     }
-  }
-}));
+  }));
+}
 app.use(compression());
 app.use(morgan('combined', {stream: accessLogStream}));
 
@@ -214,6 +239,10 @@ app.use(async (req, res, next) => {
     res.locals.isAuthenticated = !!req.user;
     res.locals.currentUser = req.user;
     res.locals.currentRole = req.user && req.user.role ? req.user.role.name : null;
+
+    // Expose PayPal client ID and mode for client-side SDK (views can read these)
+    res.locals.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || '';
+    res.locals.PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox';
 
     // Compute cartCount for header if user exists
     res.locals.cartCount = 0;
@@ -347,8 +376,10 @@ app.get('/api/roles', roleAuth.ensureAdmin, userController.getRoles);
 // Mount routes with role-based protection
 app.use('/admin', roleAuth.ensureAdmin, adminRoutes);
 app.use('/warehouse', roleAuth.ensureRoles(['Warehouse', 'Administrator']), warehouseRoutes);
-app.use('/payment', roleAuth.ensureRoles(['Finance', 'Administrator']), paymentRoutes);
+// Payment routes are mounted publicly; sensitive endpoints are protected inside routes/payment.js
+app.use('/payment', paymentRoutes);
 app.use('/delivery', roleAuth.ensureRoles(['Delivery', 'Administrator']), require('./routes/delivery'));
+
 app.use("/auth", authRoutes);
 app.use(shopRoutes);
 
@@ -477,6 +508,66 @@ async function startServer() {
         });
 
         console.log('Default dev users created (admin@bookstore.com / admin123, customer@bookstore.com / customer123)');
+      }
+
+      // Development helper: ensure guestToken column exists to avoid runtime errors
+      try {
+        console.log('Dev: ensuring carts.guestToken column exists');
+        await sequelize.query('ALTER TABLE "carts" ADD COLUMN IF NOT EXISTS "guestToken" VARCHAR(255);');
+        // create unique index if not exists to match model unique constraint
+        await sequelize.query('DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = \'' + 'carts_guestToken_unique_idx' + '\') THEN CREATE UNIQUE INDEX "carts_guestToken_unique_idx" ON "carts" ("guestToken"); END IF; END$$;');
+        console.log('Dev: ensured carts.guestToken exists');
+      } catch (fixErr) {
+        console.warn('Dev: failed to ensure guestToken column/index, continuing. Error:', fixErr && (fixErr.message || fixErr));
+      }
+
+      // Development helper: ensure payments table has expected columns
+      try {
+        console.log('Dev: ensuring payments table columns exist');
+        // add columns present in the Payment model (underscored fields)
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "payment_id" VARCHAR(255);');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "transaction_id" VARCHAR(255);');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "amount" NUMERIC(10,2) NOT NULL DEFAULT 0;');
+        // Use GBP as the default currency for this project
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "currency" VARCHAR(3) DEFAULT \'GBP\';');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "status" VARCHAR(20) DEFAULT \'Pending\';');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "payment_method" VARCHAR(50);');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "processed_at" TIMESTAMP;');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "payer_email" VARCHAR(255);');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "payer_name" VARCHAR(255);');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "metadata" JSON;');
+        // also ensure camelCase named columns exist to support older code
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "paymentId" VARCHAR(255);');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "transactionId" VARCHAR(255);');
+
+        // ensure unique index on payment_id if present
+        await sequelize.query('DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = \'payments_payment_id_unique_idx\') THEN CREATE UNIQUE INDEX "payments_payment_id_unique_idx" ON "payments" ("payment_id"); END IF; END$$;');
+
+        // Make sure any existing NOT NULL constraints on payment id columns are removed so inserts can succeed
+        await sequelize.query("DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payments' AND column_name='paymentId' AND is_nullable='NO') THEN EXECUTE 'ALTER TABLE \"payments\" ALTER COLUMN \"paymentId\" DROP NOT NULL'; END IF; END$$;");
+        await sequelize.query("DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payments' AND column_name='payment_id' AND is_nullable='NO') THEN EXECUTE 'ALTER TABLE \"payments\" ALTER COLUMN \"payment_id\" DROP NOT NULL'; END IF; END$$;");
+
+        console.log('Dev: ensured payments table columns exist');
+      } catch (payFixErr) {
+        console.warn('Dev: failed to ensure payments columns, continuing. Error:', payFixErr && (payFixErr.message || payFixErr));
+      }
+
+      try {
+        console.log('Dev: ensuring payments.createdAt and payments.updatedAt exist');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;');
+        await sequelize.query('ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;');
+        // Also add snake_case timestamp columns to support raw SQL or older code that expects created_at/updated_at
+        await sequelize.query("ALTER TABLE \"payments\" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;");
+        await sequelize.query("ALTER TABLE \"payments\" ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;");
+
+        // Ensure timestamps are nullable or have defaults
+        await sequelize.query("DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payments' AND column_name='createdAt' AND is_nullable='NO') THEN EXECUTE 'ALTER TABLE \"payments\" ALTER COLUMN \"createdAt\" DROP NOT NULL'; END IF; END$$;");
+        await sequelize.query("DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payments' AND column_name='updatedAt' AND is_nullable='NO') THEN EXECUTE 'ALTER TABLE \"payments\" ALTER COLUMN \"updatedAt\" DROP NOT NULL'; END IF; END$$;");
+        await sequelize.query("DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payments' AND column_name='created_at' AND is_nullable='NO') THEN EXECUTE 'ALTER TABLE \"payments\" ALTER COLUMN created_at DROP NOT NULL'; END IF; END$$;");
+        await sequelize.query("DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payments' AND column_name='updated_at' AND is_nullable='NO') THEN EXECUTE 'ALTER TABLE \"payments\" ALTER COLUMN updated_at DROP NOT NULL'; END IF; END$$;");
+        console.log('Dev: ensured payments timestamps exist (camelCase + snake_case)');
+      } catch (tsErr) {
+        console.warn('Dev: failed to ensure payments timestamps:', tsErr && (tsErr.message || tsErr));
       }
     }
 

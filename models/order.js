@@ -24,7 +24,7 @@ const Order = sequelize.define('order', {
   },
   currency: {
     type: Sequelize.STRING(3),
-    defaultValue: 'USD'
+      defaultValue: 'GBP'
   },
   notes: {
     type: Sequelize.TEXT,
@@ -37,6 +37,24 @@ const Order = sequelize.define('order', {
   cancelReason: {
     type: Sequelize.TEXT,
     allowNull: true
+  }
+}, {
+  hooks: {
+    beforeValidate: (order, options) => {
+      if (!order.orderNumber) {
+        const timestamp = Date.now();
+        const rand = Math.floor(Math.random() * 90000) + 10000;
+        order.orderNumber = `ORD-${timestamp}-${rand}`;
+      }
+    },
+    beforeCreate: (order, options) => {
+      // Ensure a unique, human-friendly order number exists
+      if (!order.orderNumber) {
+        const timestamp = Date.now();
+        const rand = Math.floor(Math.random() * 90000) + 10000; // 5 digit random
+        order.orderNumber = `ORD-${timestamp}-${rand}`;
+      }
+    }
   }
 });
 

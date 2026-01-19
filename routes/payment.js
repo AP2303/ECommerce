@@ -34,4 +34,7 @@ router.get("/reports", paymentController.getReportsPage);
 router.get('/reconciliation', paymentController.getReconciliationPage);
 router.get('/refunds', paymentController.getRefundsPage);
 
+// Development-only test endpoint to verify PayPal API connectivity
+router.get('/test', paymentController.testCreate);
+
 module.exports = router;

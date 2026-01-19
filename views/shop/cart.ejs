@@ -1,5 +1,6 @@
 <%- include('../includes/head.ejs') %>
     <link rel="stylesheet" href="/css/cart.css">
+    <meta name="paypal-client-id" content="<%= PAYPAL_CLIENT_ID %>">
     </head>
 
     <body>
@@ -16,7 +17,7 @@
                         <div style="flex:1;">
                           <h3 style="margin:0 0 4px 0;"><%= p.title %></h3>
                           <p style="margin:0;color:#666;">Quantity: <%= p.cartItem.quantity %></p>
-                          <p style="margin:6px 0 0 0;font-weight:700;">$<%= ((p.price||0) * (p.cartItem.quantity||1)).toFixed(2) %></p>
+                          <p style="margin:6px 0 0 0;font-weight:700;">£<%= ((p.price||0) * (p.cartItem.quantity||1)).toFixed(2) %></p>
                         </div>
                         <div>
                           <form action="/cart-delete-item" method="POST">
@@ -29,13 +30,17 @@
                 </div>
                 <hr>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
-                  <div style="font-weight:700;">Total: $<%= total.toFixed(2) %></div>
-                  <form action="/create-order" method="POST">
-                    <button class="btn">Place Order</button>
-                  </form>
+                  <div style="font-weight:700;">Total: £<%= total.toFixed(2) %></div>
+                  <div style="display:flex;gap:10px;align-items:center;">
+
+                    <button id="cart-paypal-btn" class="btn">Pay with PayPal</button>
+                  </div>
                 </div>
             <% } else { %>
                 <h1>No Products in Cart!</h1>
             <% } %>
         </main>
         <%- include('../includes/end.ejs') %>
+        <div id="paypal-button-container" style="display:none;margin-top:16px"></div>
+        <script src="https://www.paypal.com/sdk/js?client-id=<%= PAYPAL_CLIENT_ID %>&currency=GBP&locale=en_GB&intent=capture&components=buttons"></script>
+         <script src="/js/cart-paypal.js"></script>

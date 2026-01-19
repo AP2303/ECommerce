@@ -10,16 +10,22 @@ const Payment = sequelize.define('payment', {
   },
   paymentId: {
     type: Sequelize.STRING,
-    allowNull: false,
-    unique: true,
-    comment: 'External payment provider ID (e.g., PayPal payment ID)',
-    field: 'payment_id'
+    allowNull: false, // DB expects a payment id for persisted records
+    unique: false,
+    comment: 'External payment provider ID (e.g., PayPal payment ID)'
+    // removed `field: 'payment_id'` so the model uses camelCase column `paymentId`
+  },
+  orderId: {
+    type: Sequelize.INTEGER,
+    allowNull: true,
+    comment: 'Local order id this payment relates to'
+    // removed `field: 'order_id'`
   },
   transactionId: {
     type: Sequelize.STRING,
     allowNull: true,
-    comment: 'Transaction ID after successful payment',
-    field: 'transaction_id'
+    comment: 'Transaction ID after successful payment'
+    // removed `field: 'transaction_id'`
   },
   amount: {
     type: Sequelize.DECIMAL(10, 2),
@@ -27,7 +33,7 @@ const Payment = sequelize.define('payment', {
   },
   currency: {
     type: Sequelize.STRING(3),
-    defaultValue: 'USD'
+    defaultValue: 'GBP'
   },
   status: {
     type: Sequelize.ENUM('Pending', 'Completed', 'Failed', 'Cancelled', 'Refunded'),
@@ -35,24 +41,25 @@ const Payment = sequelize.define('payment', {
   },
   paymentMethod: {
     type: Sequelize.STRING,
-    allowNull: false,
-    comment: 'PayPal, CreditCard, etc.',
-    field: 'payment_method'
+    allowNull: true,
+    defaultValue: 'PayPal',
+    comment: 'PayPal, CreditCard, etc.'
+    // removed `field: 'payment_method'`
   },
   processedAt: {
     type: Sequelize.DATE,
-    allowNull: true,
-    field: 'processed_at'
+    allowNull: true
+    // removed `field: 'processed_at'`
   },
   payerEmail: {
     type: Sequelize.STRING,
-    allowNull: true,
-    field: 'payer_email'
+    allowNull: true
+    // removed `field: 'payer_email'`
   },
   payerName: {
     type: Sequelize.STRING,
-    allowNull: true,
-    field: 'payer_name'
+    allowNull: true
+    // removed `field: 'payer_name'`
   },
   metadata: {
     type: Sequelize.JSON,
@@ -60,7 +67,10 @@ const Payment = sequelize.define('payment', {
     comment: 'Additional payment data from provider'
   }
 }, {
-  underscored: true
+  // Use default camelCase timestamps (createdAt / updatedAt) to match your DB
+  timestamps: true,
+  underscored: false,
+  tableName: 'payments'
 });
 
 module.exports = Payment;

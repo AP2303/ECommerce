@@ -7,6 +7,12 @@ const Cart = sequelize.define('cart', {
     autoIncrement: true,
     allowNull: false,
     primaryKey: true
+  },
+  guestToken: {
+    type: Sequelize.STRING,
+    allowNull: true,
+    unique: true,
+    comment: 'Optional token to associate a cart with a guest via cookie'
   }
 })
 
