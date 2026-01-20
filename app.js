@@ -168,60 +168,108 @@ const warehouseRoutes = require("./routes/warehouse");
 const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), {flags: 'a'})
 
 
-// Set Permissions-Policy to allow payment features (silences PayPal warnings)
+// Use an explicit Content Security Policy that permits PayPal SDK, Sandbox, Cloudflare insights and
+// the inline scripts the PayPal SDK injects. Previously we only applied a relaxed CSP in
+// development; on the server NODE_ENV may be 'production' and helmet() without options was
+// enforcing a stricter policy that blocked PayPal's inline execution. To avoid that, configure
+// helmet with the required directives in all environments. In a stricter production deployment
+// you should replace 'unsafe-inline' with nonces or hashes as a security improvement.
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  // Allow PayPal scripts (live & sandbox) and inline execution needed by the SDK
+  scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://www.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypal.com', 'https://www.sandbox.paypalobjects.com', 'https://*.paypal.com', 'https://*.paypalobjects.com', 'https://static.cloudflareinsights.com'],
+  // Explicit element-level script source directive (used by some browsers)
+  scriptSrcElem: ["'self'", "'unsafe-inline'", 'https://www.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypal.com', 'https://www.sandbox.paypalobjects.com', 'https://static.cloudflareinsights.com'],
+  // Allow HTTPS styles (e.g., Google Fonts) and inline styles used in templates
+  styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+  // Allow fonts and data URIs
+  fontSrc: ["'self'", 'https:', 'data:'],
+  // Allow images from any HTTPS origin and data URIs; image proxy will enforce a host allowlist
+  imgSrc: ["'self'", 'data:', 'https:'],
+  // Allow connections to PayPal APIs, sandbox logger endpoints and Google ad/conversion hosts
+  connectSrc: [
+    "'self'",
+    'https://api-m.sandbox.paypal.com',
+    'https://api-m.paypal.com',
+    'https://www.sandbox.paypal.com',
+    'https://www.paypal.com',
+    'https://*.paypal.com',
+    'https://c.paypal.com',
+    'https://www.google.com',
+    'https://www.google-analytics.com',
+    'https://www.googleadservices.com',
+    'https://pagead2.googlesyndication.com',
+    'https://www.googletagmanager.com'
+  ],
+  // Allow frames from PayPal (sandbox & live)
+  frameSrc: ["'self'", 'https://www.paypal.com', 'https://www.sandbox.paypal.com', 'https://*.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypalobjects.com'],
+  objectSrc: ["'none'"],
+  baseUri: ["'self'"],
+  formAction: ["'self'", 'https://www.sandbox.paypal.com', 'https://www.paypal.com']
+};
+
+// Apply helmet with our CSP directives in all environments. In production you can tighten the
+// policy (remove 'unsafe-inline' and 'unsafe-eval') and switch to nonces/hashes for inline scripts.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: cspDirectives
+  },
+  // Use Helmet's permissionsPolicy to set the Permissions-Policy header correctly
+  permissionsPolicy: {
+    features: {
+      // Allow PayPal origins to use the Payment Request API
+      payment: [ 'https://www.paypal.com', 'https://www.sandbox.paypal.com' ]
+    }
+  }
+}));
+
+// Ensure sandbox fingerprint/collector host is allowed and set a clear Permissions-Policy header
+// Some browsers/PayPal flows expect the header in a specific format; add an explicit header middleware
 app.use((req, res, next) => {
-  res.setHeader('Permissions-Policy', 'payment=*');
+  // Add c.sandbox.paypal.com to CSP connectSrc if absent (best-effort — header already set by Helmet above)
+  // Also set an explicit Permissions-Policy header that includes self and PayPal origins
+  try {
+    // Construct a conservative CSP string that explicitly includes the PayPal hosts we saw failing
+    const cspHeader = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.paypal.com https://www.paypalobjects.com https://www.sandbox.paypal.com https://www.sandbox.paypalobjects.com https://c.paypal.com https://c.paypalobjects.com https://*.paypal.com https://*.paypalobjects.com https://static.cloudflareinsights.com",
+      "script-src-elem 'self' 'unsafe-inline' https://www.paypal.com https://www.paypalobjects.com https://www.sandbox.paypal.com https://www.sandbox.paypalobjects.com https://static.cloudflareinsights.com",
+      "style-src 'self' 'unsafe-inline' https:",
+      "font-src 'self' https: data: https://www.paypalobjects.com https://www.paypal.com",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https://api-m.sandbox.paypal.com https://api-m.paypal.com https://www.sandbox.paypal.com https://www.paypal.com https://c.paypal.com https://postcollector.paypal.com https://*.paypal.com https://*.paypalobjects.com https://www.google.com https://www.google-analytics.com https://www.googleadservices.com https://pagead2.googlesyndication.com https://www.googletagmanager.com",
+      "frame-src 'self' https://www.paypal.com https://www.sandbox.paypal.com https://*.paypal.com https://www.paypalobjects.com https://www.sandbox.paypalobjects.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self' https://www.sandbox.paypal.com https://www.paypal.com"
+    ].join('; ');
+
+    // Override Helmet's CSP header with our explicit value to avoid subtle formatting differences
+    res.setHeader('Content-Security-Policy', cspHeader);
+
+    // Permissions-Policy: explicitly allow the Payment Request API for PayPal origins and the current origin
+    // Older browsers used 'Feature-Policy' but modern browsers respect 'Permissions-Policy'.
+    res.setHeader('Permissions-Policy', 'payment=(self "https://www.sandbox.paypal.com" "https://www.paypal.com" "https://c.paypal.com" "https://postcollector.paypal.com")');
+  } catch (e) {
+    // Swallow and continue — setting headers may fail in some environments
+    console.warn('Failed to set explicit Content-Security-Policy / Permissions-Policy header:', e && e.message ? e.message : e);
+  }
+
   next();
 });
-
-// Use a permissive CSP during development to allow PayPal Sandbox, conversion pixels and image proxies to function.
-if (process.env.NODE_ENV === 'production') {
-  app.use(helmet());
-} else {
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        // Allow PayPal scripts (live & sandbox) and inline execution needed by the SDK
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://www.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypal.com', 'https://www.sandbox.paypalobjects.com', 'https://*.paypal.com', 'https://*.paypalobjects.com'],
-        // Allow inline event handlers (development helper) - in production lock this down
-        scriptSrcAttr: ["'unsafe-inline'"],
-        // Allow HTTPS styles (e.g., Google Fonts) and inline styles used in templates
-        styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
-        // Allow fonts and data URIs
-        fontSrc: ["'self'", 'https:', 'data:'],
-        // Allow images from any HTTPS origin and data URIs; image proxy will enforce a host allowlist
-        imgSrc: ["'self'", 'data:', 'https:'],
-        // Allow connections to PayPal APIs, sandbox logger endpoints and Google ad/conversion hosts
-        connectSrc: [
-          "'self'",
-          'https://api-m.sandbox.paypal.com',
-          'https://api-m.paypal.com',
-          'https://www.sandbox.paypal.com',
-          'https://www.paypal.com',
-          'https://*.paypal.com',
-          'https://c.paypal.com',
-          'https://www.google.com',
-          'https://www.google-analytics.com',
-          'https://www.googleadservices.com',
-          'https://pagead2.googlesyndication.com',
-          'https://www.googletagmanager.com'
-        ],
-        // Allow frames from PayPal (sandbox & live)
-        frameSrc: ["'self'", 'https://www.paypal.com', 'https://www.sandbox.paypal.com', 'https://*.paypal.com', 'https://www.paypalobjects.com', 'https://www.sandbox.paypalobjects.com'],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'", 'https://www.sandbox.paypal.com', 'https://www.paypal.com']
-      }
-    }
-  }));
-}
 app.use(compression());
 app.use(morgan('combined', {stream: accessLogStream}));
 
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
+
+// Remove manual header middleware — Helmet now manages Permissions-Policy
+// app.use((req, res, next) => {
+//   res.setHeader('Permissions-Policy', 'payment=(self "https://www.sandbox.paypal.com" "https://www.paypal.com")');
+//   next();
+//});
+
 
 // Load user from session into req.user
 app.use(async (req, res, next) => {
@@ -249,6 +297,9 @@ app.use(async (req, res, next) => {
     // Expose PayPal client ID and mode for client-side SDK (views can read these)
     res.locals.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || '';
     res.locals.PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox';
+    // Force buyer country to GB to avoid locale mismatches on the server-rendered SDK tag
+    res.locals.PAYPAL_BUYER_COUNTRY = 'GB';
+    res.locals.PAYPAL_LOCALE = 'en_GB';
 
     // Compute cartCount for header if user exists
     res.locals.cartCount = 0;

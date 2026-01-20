@@ -253,6 +253,13 @@ exports.paymentSuccess = async (req, res) => {
 
     const captureResp = await client.execute(request);
 
+    // LOG capture response for debugging declined transactions
+    try {
+      console.log('paymentSuccess: PayPal capture response for token=', token, JSON.stringify(captureResp.result || {}));
+    } catch (logErr) {
+      console.log('paymentSuccess: could not stringify captureResp.result', captureResp.result);
+    }
+
     // Find payment record by paymentId
     const paymentRecord = await Payment.findOne({ where: { paymentId: token } });
     if (paymentRecord) {
@@ -318,6 +325,13 @@ exports.postExecutePayment = async (req, res) => {
     request.requestBody({});
 
     const captureResp = await client.execute(request);
+
+    // LOG capture response for debugging declined transactions
+    try {
+      console.log('postExecutePayment: PayPal capture response for token=', token, JSON.stringify(captureResp.result || {}));
+    } catch (logErr) {
+      console.log('postExecutePayment: could not stringify captureResp.result', captureResp.result);
+    }
 
     // Update payment record
     const paymentRecord = await Payment.findOne({ where: { paymentId: token } });
@@ -505,6 +519,13 @@ exports.createPayPalOrder = async (req, res) => {
       console.error('createPayPalOrder: PayPal API call failed', paypalErr && (paypalErr.statusCode || paypalErr.message || paypalErr));
       const detail = (paypalErr && (paypalErr.message || paypalErr.statusCode)) || String(paypalErr);
       return res.status(502).json({ error: 'Failed to create PayPal order', detail });
+    }
+
+    // LOG: include result details to aid debugging declined transactions
+    try {
+      console.log('createPayPalOrder: PayPal create response result:', JSON.stringify(createResp.result || {}));
+    } catch (logErr) {
+      console.log('createPayPalOrder: Could not stringify createResp.result', createResp.result);
     }
 
     if (!createResp || !createResp.result || !createResp.result.id) {

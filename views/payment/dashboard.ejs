@@ -176,6 +176,11 @@
 <body>
     <%- include('../includes/navigation.ejs') %>
 
+    <% // Helper formatters to ensure values are numbers before calling toFixed %>
+    <% const formatNumber = (v, digits = 2) => { const n = Number(v); return isFinite(n) ? n.toFixed(digits) : (digits === 0 ? '0' : (digits === 1 ? '0.0' : '0.00')); }; %>
+    <% const formatMoney = (v) => formatNumber(v, 2); %>
+    <% const formatPercent = (v) => formatNumber(v, 1); %>
+
     <main class="finance-dashboard">
         <div class="finance-header">
             <div>
@@ -190,22 +195,22 @@
         <div class="revenue-stats">
             <div class="revenue-card success">
                 <h3>Total Revenue</h3>
-                <div class="amount">$<%= (locals.totalRevenue || 0).toFixed(2) %></div>
-                <div class="trend">↗ <%= (locals.revenueGrowth || 0).toFixed(1) %>% vs last month</div>
+                <div class="amount">$<%= formatMoney(locals.totalRevenue) %></div>
+                <div class="trend">↗ <%= formatPercent(locals.revenueGrowth) %>% vs last month</div>
             </div>
             <div class="revenue-card">
                 <h3>This Month</h3>
-                <div class="amount">$<%= (locals.monthRevenue || 0).toFixed(2) %></div>
+                <div class="amount">$<%= formatMoney(locals.monthRevenue) %></div>
                 <div class="trend">From <%= locals.monthOrders || 0 %> orders</div>
             </div>
             <div class="revenue-card">
                 <h3>Today</h3>
-                <div class="amount">$<%= (locals.todayRevenue || 0).toFixed(2) %></div>
+                <div class="amount">$<%= formatMoney(locals.todayRevenue) %></div>
                 <div class="trend">From <%= locals.todayOrders || 0 %> orders</div>
             </div>
             <div class="revenue-card info">
                 <h3>Avg Order Value</h3>
-                <div class="amount">$<%= (locals.avgOrderValue || 0).toFixed(2) %></div>
+                <div class="amount">$<%= formatMoney(locals.avgOrderValue) %></div>
                 <div class="trend">Per transaction</div>
             </div>
             <div class="revenue-card">
@@ -236,20 +241,20 @@
                 <table class="summary-table">
                     <tr>
                         <td>Completed Orders</td>
-                        <td>$<%= (locals.completedRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.completedRevenue) %></td>
                     </tr>
                     <tr>
                         <td>Pending Payments</td>
-                        <td>$<%= (locals.pendingRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.pendingRevenue) %></td>
                     </tr>
                     <tr>
                         <td>Refunded</td>
-                        <td style="color: #e74c3c;">-$<%= (locals.refundedAmount || 0).toFixed(2) %></td>
+                        <td style="color: #e74c3c;">-$<%= formatMoney(locals.refundedAmount) %></td>
                     </tr>
                     <tr style="border-top: 2px solid #333;">
                         <td><strong>Net Revenue</strong></td>
                         <td style="color: #27ae60; font-size: 18px;">
-                            $<%= ((locals.completedRevenue || 0) - (locals.refundedAmount || 0)).toFixed(2) %>
+                            $<%= formatMoney((Number(locals.completedRevenue) || 0) - (Number(locals.refundedAmount) || 0)) %>
                         </td>
                     </tr>
                 </table>
@@ -264,13 +269,13 @@
                                 <h4>Order #<%= transaction.orderNumber || transaction.orderId %></h4>
                                 <p>
                                     <%= new Date(transaction.createdAt).toLocaleString() %>
-                                    <span class="transaction-status status-<%= transaction.status.toLowerCase() %>">
-                                        <%= transaction.status %>
+                                    <span class="transaction-status status-<%= (transaction.status || '').toLowerCase() %>">
+                                        <%= transaction.status || 'Unknown' %>
                                     </span>
                                 </p>
                             </div>
                             <div class="transaction-amount">
-                                $<%= (transaction.amount || 0).toFixed(2) %>
+                                $<%= formatMoney(transaction.amount) %>
                             </div>
                         </div>
                     <% }) %>
@@ -291,15 +296,15 @@
                 <table class="summary-table">
                     <tr>
                         <td>PayPal</td>
-                        <td>$<%= (locals.paypalRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.paypalRevenue) %></td>
                     </tr>
                     <tr>
                         <td>Credit Card</td>
-                        <td>$<%= (locals.creditCardRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.creditCardRevenue) %></td>
                     </tr>
                     <tr>
                         <td>Other</td>
-                        <td>$<%= (locals.otherRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.otherRevenue) %></td>
                     </tr>
                 </table>
             </div>
@@ -334,16 +339,16 @@
                     </tr>
                     <tr>
                         <td>Average Per Day</td>
-                        <td>$<%= (locals.avgDailyRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.avgDailyRevenue) %></td>
                     </tr>
                     <tr>
                         <td>Projected This Month</td>
-                        <td>$<%= (locals.projectedRevenue || 0).toFixed(2) %></td>
+                        <td>$<%= formatMoney(locals.projectedRevenue) %></td>
                     </tr>
                     <tr>
                         <td>Growth Rate</td>
-                        <td style="color: <%= (locals.growthRate || 0) >= 0 ? '#27ae60' : '#e74c3c' %>">
-                            <%= (locals.growthRate || 0).toFixed(1) %>%
+                        <td style="color: <%= (Number(locals.growthRate) || 0) >= 0 ? '#27ae60' : '#e74c3c' %>">
+                            <%= formatPercent(locals.growthRate) %>%
                         </td>
                     </tr>
                 </table>
@@ -353,4 +358,3 @@
 
 
 <%- include('../includes/end.ejs') %>
-
